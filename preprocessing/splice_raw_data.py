@@ -1,13 +1,18 @@
 import os
 import sox
 
-input_dir_name = 'original_data'
-output_dir_name = 'splices'
+# input_dir_name = '/home/paperspace/Documents' +\
+#                  '/TEDLIUM/TEDLIUM_release2/dev/sph'
+# input_dir_name = '/home/paperspace/Documents' +\
+#                  '/TEDLIUM/TEDLIUM_release2/test/sph'
+input_dir_name = '/home/paperspace/Documents' +\
+                 '/TEDLIUM/TEDLIUM_release2/train/sph'
 duration_chunks = 10  # in seconds
 start_time = 30  # in seconds
 downsample_rate = 4000  # in kbps
 
-ds_output_dir_name = 'downsampled_{}'.format(output_dir_name)
+output_dir_name = os.path.join(input_dir_name, 'splices')
+ds_output_dir_name = os.path.join(input_dir_name, 'downsampled_splices')
 
 if not os.path.exists(output_dir_name):
     os.makedirs(output_dir_name)
@@ -51,5 +56,5 @@ for filename in os.listdir(input_dir_name):
         splice.build(input_filename, output_filename)
         splice_and_downsample.build(input_filename, ds_output_filename)
 
-        print('Finished split {} of {} for {}'.format(i, n_iterations, 
+        print('Finished split {} of {} for {}'.format(i, n_iterations,
                                                       filename_base))
