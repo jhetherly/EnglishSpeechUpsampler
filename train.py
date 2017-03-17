@@ -1,22 +1,18 @@
 import numpy as np
 import librosa
 from inputs import get_bit_rates_and_waveforms, get_truth_ds_filename_pairs
-from inputs import read_file_pair
+from inputs import read_file_pair, randomly_batch
 import tensorflow as tf
 from models import single_fully_connected_model
 from models import three_layer_conv_model, five_layer_conv_model
-from models import three_layer_conv_with_res_model
-
 
 # Constants describing the training process.
 NUM_EPOCHS_PER_DECAY = 500.0      # Epochs after which learning rate decays.
 LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
 
-example_number = 0
-use_super_simple_model = False
 waveform_reduction_factor = 1
-write_tb = False
+write_tb = True
 file_name_lists_dir = '/home/paperspace/Documents/EnglishSpeechUpsampler/aux'
 
 
@@ -50,23 +46,12 @@ second_conv_window = 1
 # thrid_conv_window = bits_per_second/6000
 thrid_conv_window = 15
 
-if use_super_simple_model:
-    x, model = single_fully_connected_model(true_wf.dtype, true_wf.shape,
-                                            true_wf.size, true_wf.size,
-                                            write_tb)
-else:
-    # x, model = five_layer_conv_model(true_wf.dtype, true_wf.shape)
-
-    # x, model = three_layer_conv_with_res_model(true_wf.dtype, true_wf.shape,
-    #                                   first_conv_window, first_conv_depth,
-    #                                   second_conv_window, second_conv_depth,
-    #                                   thrid_conv_window,
-    #                                   write_tb)
-    x, model = three_layer_conv_model(true_wf.dtype, true_wf.shape,
-                                      first_conv_window, first_conv_depth,
-                                      second_conv_window, second_conv_depth,
-                                      thrid_conv_window,
-                                      write_tb)
+# x, model = five_layer_conv_model(true_wf.dtype, true_wf.shape)
+x, model = three_layer_conv_model(true_wf.dtype, true_wf.shape,
+                                  first_conv_window, first_conv_depth,
+                                  second_conv_window, second_conv_depth,
+                                  thrid_conv_window,
+                                  write_tb)
 
 # placeholder for the truth label
 y_true = tf.placeholder(true_wf.dtype,
@@ -131,7 +116,7 @@ sess = tf.Session()
 merged = tf.summary.merge_all()
 train_writer = tf.summary.FileWriter('aux/tensorboard/train',
                                      sess.graph)
-# validation_writer = tf.summary.FileWriter('aux/tensorboard/validation')
+validation_writer = tf.summary.FileWriter('aux/tensorboard/validation')
 
 # initialize the variables for the session
 sess.run(tf.global_variables_initializer())
@@ -140,36 +125,42 @@ sess.run(tf.global_variables_initializer())
 # TRAINING LOOP
 # #############
 
-truth, example = read_file_pair(train_truth_ds_pairs[example_number])
-
-# truth = truth[::waveform_reduction_factor]
-# example = example[::waveform_reduction_factor]
-truth = truth[:waveform_max]
-example = example[:waveform_max]
-print('loss score of example {}'.format(np.mean((truth-example)**2)))
-for i in range(500):
-    # if (i + 1) % 1 == 0 or i == 0:
+val_loss_file = open('val_loss.txt', 'w')
+train_loss_file = open('train_loss.txt', 'w')
+for i in range(50000):
+    batch = randomly_batch(20, train_truth_ds_pairs)
     if (i + 1) % 100 == 0 or i == 0:
-        # summary, loss_val = sess.run([merged, waveform_mse],
-        #             feed_dict={x: example.reshape(1, -1, 1),
-        #                        y_true: truth.reshape(1, -1, 1)}
-        # )
-        # validation_writer.add_summary(summary, i)
-        loss_val = waveform_mse.eval(
-            feed_dict={x: example.reshape(1, -1, 1),
-                       y_true: truth.reshape(1, -1, 1)},
-            session=sess)
-        print("Step {}, Loss {}".format((i + 1), loss_val))
+        vbatch = randomly_batch(1, val_truth_ds_pairs)
+        summary, loss_val = sess.run([merged, waveform_mse],
+                                     feed_dict={x: vbatch[1],
+                                                y_true: vbatch[0]}
+                                     )
+        validation_writer.add_summary(summary, i)
+        val_loss_file.write('{}'.format(loss_val))
+        # loss_val = waveform_mse.eval(
+        #     feed_dict={x: batch[1],
+        #                y_true: batch[0]},
+        #     session=sess)
+        # print("Step {}, Loss {}".format((i + 1), loss_val))
     if write_tb:
-        summary, _ = sess.run([merged, train_step],
-                              feed_dict={x: example.reshape(1, -1, 1),
-                                         y_true: truth.reshape(1, -1, 1)})
+        summary, _, loss = sess.run([merged, train_step, waveform_mse],
+                                    feed_dict={x: batch[1],
+                                               y_true: batch[0]})
         train_writer.add_summary(summary, i)
+        train_loss_file.write('{}'.format(loss))
     else:
-        train_step.run(feed_dict={x: example.reshape(1, -1, 1),
-                                  y_true: truth.reshape(1, -1, 1)},
+        train_step.run(feed_dict={x: batch[1],
+                                  y_true: batch[0]},
                        session=sess)
 
+val_loss_file.close()
+train_loss_file.close()
+# Save the variables to disk.
+save_path = saver.save(sess, "aux/model_checkpoints/{}.ckpt".format(
+    model.name))
+print("Model checkpoints will be saved in file: {}".format(save_path))
+
+truth, example = read_file_pair(val_truth_ds_pairs[0])
 y_reco = model.eval(feed_dict={x: example.reshape(1, -1, 1)},
                     session=sess).flatten()
 
@@ -180,11 +171,11 @@ print(truth.flatten()[:20] - y_reco[:20])
 
 # if waveform_reduction_factor == 1:
 print('writting output audio files')
-librosa.output.write_wav('overtrain_true.wav',
+librosa.output.write_wav('full_train_validation_true.wav',
                          y=truth.flatten(), sr=true_br)
-librosa.output.write_wav('overtrain_ds.wav',
+librosa.output.write_wav('full_train_validation_ds.wav',
                          y=example.flatten(), sr=true_br)
-librosa.output.write_wav('overtrain_reco.wav',
+librosa.output.write_wav('full_train_validation_reco.wav',
                          y=y_reco, sr=true_br)
 # #############
 # #############

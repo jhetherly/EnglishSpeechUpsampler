@@ -49,6 +49,58 @@ def bias_variable(shape, name=None):
 def conv1d(x, W, name=None):
     return tf.nn.conv1d(x, W, stride=1, padding='SAME', name=name)
 
+
+def build_1d_conv_layer(prev_tensor, prev_conv_depth,
+                        conv_window, conv_depth,
+                        act, layer_number,
+                        tensorboard_output=False,
+                        name=None):
+    with tf.name_scope('{}_layer_weights'.format(layer_number)):
+        W = weight_variable([conv_window,
+                             prev_conv_depth,
+                             conv_depth])
+        if tensorboard_output:
+            histogram_variable_summaries(W)
+    with tf.name_scope('{}_layer_biases'.format(layer_number)):
+        b = bias_variable([conv_depth])
+        if tensorboard_output:
+            histogram_variable_summaries(b)
+    with tf.name_scope('{}_layer_conv_preactivation'.format(layer_number)):
+        conv = conv1d(prev_tensor, W) + b
+        if tensorboard_output:
+            histogram_variable_summaries(conv)
+    with tf.name_scope('{}_layer_conv_activation'.format(layer_number)):
+        h = act(conv, name=name)
+        if tensorboard_output:
+            histogram_variable_summaries(h)
+    return h
+
+
+def build_1d_conv_layer_with_res(prev_tensor, prev_conv_depth,
+                                 conv_window, conv_depth,
+                                 res, act, layer_number,
+                                 tensorboard_output=False,
+                                 name=None):
+    with tf.name_scope('{}_layer_weights'.format(layer_number)):
+        W = weight_variable([conv_window,
+                             prev_conv_depth,
+                             conv_depth])
+        if tensorboard_output:
+            histogram_variable_summaries(W)
+    with tf.name_scope('{}_layer_biases'.format(layer_number)):
+        b = bias_variable([conv_depth])
+        if tensorboard_output:
+            histogram_variable_summaries(b)
+    with tf.name_scope('{}_layer_conv_preactivation'.format(layer_number)):
+        conv = conv1d(prev_tensor, W) + b
+        if tensorboard_output:
+            histogram_variable_summaries(conv)
+    with tf.name_scope('{}_layer_conv_activation'.format(layer_number)):
+        h = act(tf.add(conv, res), name=name)
+        if tensorboard_output:
+            histogram_variable_summaries(h)
+    return h
+
 # ######################
 # ######################
 
@@ -90,7 +142,7 @@ def single_fully_connected_model(input_type, input_shape,
             if tensorboard_output:
                 histogram_variable_summaries(preact)
         with tf.name_scope('first_layer_activation'):
-            y = tf.identity(preact)
+            y = tf.identity(preact, name=scope_name)
             if tensorboard_output:
                 histogram_variable_summaries(y)
 
@@ -100,8 +152,9 @@ def single_fully_connected_model(input_type, input_shape,
 def three_layer_conv_model(input_type, input_shape,
                            first_conv_window=30, first_conv_depth=128,
                            second_conv_window=10, second_conv_depth=64,
-                           thrid_conv_window=15,
-                           tensorboard_output=True, scope_name='3-layer_conv'):
+                           third_conv_window=15,
+                           tensorboard_output=False,
+                           scope_name='3-layer_conv'):
 
     with tf.name_scope(scope_name):
         # input of the model (examples)
@@ -111,67 +164,112 @@ def three_layer_conv_model(input_type, input_shape,
         x = tf.placeholder(input_type, shape=s)
 
         # first conv layer
-        with tf.name_scope('first_layer_weights'):
-            W_conv1 = weight_variable([first_conv_window,
-                                       1,
-                                       first_conv_depth])
-            if tensorboard_output:
-                histogram_variable_summaries(W_conv1)
-        with tf.name_scope('first_layer_biases'):
-            b_conv1 = bias_variable([first_conv_depth])
-            if tensorboard_output:
-                histogram_variable_summaries(b_conv1)
-        with tf.name_scope('first_layer_conv_preactivation'):
-            conv1 = conv1d(x, W_conv1) + b_conv1
-            if tensorboard_output:
-                histogram_variable_summaries(conv1)
-        with tf.name_scope('first_layer_conv_activation'):
-            h_conv1 = tf.nn.elu(conv1)
-            if tensorboard_output:
-                histogram_variable_summaries(h_conv1)
+        h1 = build_1d_conv_layer(x, 1,
+                                 first_conv_window, first_conv_depth,
+                                 tf.nn.elu, 1,
+                                 tensorboard_output)
 
         # second conv layer
-        with tf.name_scope('second_layer_weights'):
-            W_conv2 = weight_variable([second_conv_window,
-                                       first_conv_depth,
-                                       second_conv_depth])
-            if tensorboard_output:
-                histogram_variable_summaries(W_conv2)
-        with tf.name_scope('second_layer_biases'):
-            b_conv2 = bias_variable([second_conv_depth])
-            if tensorboard_output:
-                histogram_variable_summaries(b_conv2)
-        with tf.name_scope('second_layer_conv_preactivation'):
-            conv2 = conv1d(h_conv1, W_conv2) + b_conv2
-            if tensorboard_output:
-                histogram_variable_summaries(conv2)
-        with tf.name_scope('second_layer_conv_activation'):
-            h_conv2 = tf.nn.elu(conv2)
-            if tensorboard_output:
-                histogram_variable_summaries(h_conv2)
+        h2 = build_1d_conv_layer(h1, first_conv_depth,
+                                 second_conv_window, second_conv_depth,
+                                 tf.nn.elu, 2,
+                                 tensorboard_output)
 
         # third (last) conv layer
-        with tf.name_scope('third_layer_weights'):
-            W_conv3 = weight_variable([thrid_conv_window,
-                                       second_conv_depth,
-                                       1])
-            if tensorboard_output:
-                histogram_variable_summaries(W_conv3)
-        with tf.name_scope('third_layer_biases'):
-            b_conv3 = bias_variable([1])
-            if tensorboard_output:
-                histogram_variable_summaries(b_conv3)
-        with tf.name_scope('third_layer_conv_preactivation'):
-            conv3 = conv1d(h_conv2, W_conv3) + b_conv3
-            if tensorboard_output:
-                histogram_variable_summaries(conv3)
-        with tf.name_scope('third_layer_conv_activation'):
-            # essentially a linear activation
-            y_conv = tf.identity(conv3)
-            if tensorboard_output:
-                comprehensive_variable_summaries(y_conv)
+        y = build_1d_conv_layer(h2, second_conv_depth,
+                                third_conv_window, 1,
+                                tf.identity, 3,
+                                tensorboard_output,
+                                scope_name)
 
-        return x, y_conv
+        return x, y
+
+
+def three_layer_conv_with_res_model(input_type, input_shape,
+                                    first_conv_window=30, first_conv_depth=128,
+                                    second_conv_window=10,
+                                    second_conv_depth=64,
+                                    third_conv_window=15,
+                                    tensorboard_output=False,
+                                    scope_name='3-layer_conv_res'):
+
+    with tf.name_scope(scope_name):
+        # input of the model (examples)
+        s = [None]
+        for i in input_shape:
+            s.append(i)
+        x = tf.placeholder(input_type, shape=s)
+
+        # first conv layer
+        h1 = build_1d_conv_layer(x, 1,
+                                 first_conv_window, first_conv_depth,
+                                 tf.nn.elu, 1,
+                                 tensorboard_output)
+
+        # second conv layer
+        h2 = build_1d_conv_layer(h1, first_conv_depth,
+                                 second_conv_window, second_conv_depth,
+                                 tf.nn.elu, 2,
+                                 tensorboard_output)
+
+        # third (last) conv layer
+        y = build_1d_conv_layer_with_res(h2, second_conv_depth,
+                                         third_conv_window, 1,
+                                         x, tf.identity, 3,
+                                         tensorboard_output,
+                                         scope_name)
+
+        return x, y
+
+
+def five_layer_conv_model(input_type, input_shape,
+                          first_conv_window=30, first_conv_depth=256,
+                          second_conv_window=20, second_conv_depth=128,
+                          third_conv_window=10, third_conv_depth=64,
+                          fourth_conv_window=5, fourth_conv_depth=32,
+                          fifth_conv_window=5,
+                          tensorboard_output=False,
+                          scope_name='5-layer_conv'):
+
+    with tf.name_scope(scope_name):
+        # input of the model (examples)
+        s = [None]
+        for i in input_shape:
+            s.append(i)
+        x = tf.placeholder(input_type, shape=s)
+
+        # first conv layer
+        h1 = build_1d_conv_layer(x, 1,
+                                 first_conv_window, first_conv_depth,
+                                 tf.nn.elu, 1,
+                                 tensorboard_output)
+
+        # second conv layer
+        h2 = build_1d_conv_layer(h1, first_conv_depth,
+                                 second_conv_window, second_conv_depth,
+                                 tf.nn.elu, 2,
+                                 tensorboard_output)
+
+        # third conv layer
+        h3 = build_1d_conv_layer(h2, second_conv_depth,
+                                 third_conv_window, third_conv_depth,
+                                 tf.nn.elu, 3,
+                                 tensorboard_output)
+
+        # fourth conv layer
+        h4 = build_1d_conv_layer(h3, third_conv_depth,
+                                 fourth_conv_window, fourth_conv_depth,
+                                 tf.nn.elu, 4,
+                                 tensorboard_output)
+
+        # fifth (last) conv layer
+        y = build_1d_conv_layer(h4, fourth_conv_depth,
+                                fifth_conv_window, 1,
+                                tf.identity, 5,
+                                tensorboard_output,
+                                scope_name)
+
+        return x, y
 
 # #################
 # #################
