@@ -6,6 +6,7 @@ import tensorflow as tf
 from models import single_fully_connected_model
 from models import three_layer_conv_model, five_layer_conv_model
 from models import three_layer_conv_with_res_model
+from models import deep_residual_network
 
 
 # Constants describing the training process.
@@ -28,7 +29,7 @@ val_truth_ds_pairs = get_truth_ds_filename_pairs(file_name_lists_dir,
 br_pairs, wf_pairs = get_bit_rates_and_waveforms(train_truth_ds_pairs[0])
 true_br = br_pairs[0]
 true_wf = wf_pairs[0]
-waveform_max = true_wf.size/waveform_reduction_factor
+waveform_max = int(true_wf.size/waveform_reduction_factor)
 # true_wf = true_wf[::waveform_reduction_factor]
 true_wf = true_wf[:waveform_max]
 # reshape for mono waveforms
@@ -43,12 +44,14 @@ bits_per_second = true_wf.size/10
 # first_conv_depth = 128
 first_conv_depth = 64
 # first_conv_window = bits_per_second/3000
-first_conv_window = 30
-second_conv_depth = first_conv_depth/2
-second_conv_window = 1
+# first_conv_window = 30
+first_conv_window = 1600
+second_conv_depth = int(first_conv_depth/2)
+# second_conv_depth = first_conv_depth
+second_conv_window = 40
 # second_conv_window = bits_per_second/4000
 # thrid_conv_window = bits_per_second/6000
-thrid_conv_window = 15
+thrid_conv_window = 160
 
 if use_super_simple_model:
     x, model = single_fully_connected_model(true_wf.dtype, true_wf.shape,
@@ -56,17 +59,18 @@ if use_super_simple_model:
                                             write_tb)
 else:
     # x, model = five_layer_conv_model(true_wf.dtype, true_wf.shape)
+    x, model = deep_residual_network(true_wf.dtype, true_wf.shape)
 
     # x, model = three_layer_conv_with_res_model(true_wf.dtype, true_wf.shape,
     #                                   first_conv_window, first_conv_depth,
     #                                   second_conv_window, second_conv_depth,
     #                                   thrid_conv_window,
     #                                   write_tb)
-    x, model = three_layer_conv_model(true_wf.dtype, true_wf.shape,
-                                      first_conv_window, first_conv_depth,
-                                      second_conv_window, second_conv_depth,
-                                      thrid_conv_window,
-                                      write_tb)
+    # x, model = three_layer_conv_model(true_wf.dtype, true_wf.shape,
+    #                                   first_conv_window, first_conv_depth,
+    #                                   second_conv_window, second_conv_depth,
+    #                                   thrid_conv_window,
+    #                                   write_tb)
 
 # placeholder for the truth label
 y_true = tf.placeholder(true_wf.dtype,
@@ -113,16 +117,13 @@ with tf.name_scope('train'):
     # train_step = tf.train.GradientDescentOptimizer(1e-2).minimize(waveform_mse)
     # train_step = tf.train.AdamOptimizer(1e-4,
     #                                     epsilon=1e-01).minimize(waveform_mse)
-    train_step = tf.train.AdamOptimizer(1e-5,
+    train_step = tf.train.AdamOptimizer(1e-4,
                                         epsilon=1e-08).minimize(waveform_mse)
     # train_step = tf.train.AdagradOptimizer(1e-3).minimize(waveform_mse)
 
 # ####################
 # ####################
 
-
-# Add ops to save and restore all the variables.
-saver = tf.train.Saver()
 
 # create session
 sess = tf.Session()
@@ -141,13 +142,17 @@ sess.run(tf.global_variables_initializer())
 # #############
 
 truth, example = read_file_pair(train_truth_ds_pairs[example_number])
-
-# truth = truth[::waveform_reduction_factor]
-# example = example[::waveform_reduction_factor]
 truth = truth[:waveform_max]
 example = example[:waveform_max]
+truth_batch = []
+example_batch = []
+
+batch_size = 5
+for i in range(batch_size):
+    truth_batch.append(truth)
+    example_batch.append(example)
 print('loss score of example {}'.format(np.mean((truth-example)**2)))
-for i in range(500):
+for i in range(10000):
     # if (i + 1) % 1 == 0 or i == 0:
     if (i + 1) % 100 == 0 or i == 0:
         # summary, loss_val = sess.run([merged, waveform_mse],
@@ -159,15 +164,15 @@ for i in range(500):
             feed_dict={x: example.reshape(1, -1, 1),
                        y_true: truth.reshape(1, -1, 1)},
             session=sess)
-        print("Step {}, Loss {}".format((i + 1), loss_val))
+        print("Epoch {}, Loss {}".format((i + 1), loss_val))
     if write_tb:
         summary, _ = sess.run([merged, train_step],
-                              feed_dict={x: example.reshape(1, -1, 1),
-                                         y_true: truth.reshape(1, -1, 1)})
+                              feed_dict={x: example_batch,
+                                         y_true: truth_batch})
         train_writer.add_summary(summary, i)
     else:
-        train_step.run(feed_dict={x: example.reshape(1, -1, 1),
-                                  y_true: truth.reshape(1, -1, 1)},
+        train_step.run(feed_dict={x: example_batch,
+                                  y_true: truth_batch},
                        session=sess)
 
 y_reco = model.eval(feed_dict={x: example.reshape(1, -1, 1)},

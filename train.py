@@ -24,7 +24,7 @@ val_truth_ds_pairs = get_truth_ds_filename_pairs(file_name_lists_dir,
 br_pairs, wf_pairs = get_bit_rates_and_waveforms(train_truth_ds_pairs[0])
 true_br = br_pairs[0]
 true_wf = wf_pairs[0]
-waveform_max = true_wf.size/waveform_reduction_factor
+waveform_max = int(true_wf.size/waveform_reduction_factor)
 # true_wf = true_wf[::waveform_reduction_factor]
 true_wf = true_wf[:waveform_max]
 # reshape for mono waveforms
@@ -40,7 +40,7 @@ bits_per_second = true_wf.size/10
 first_conv_depth = 64
 # first_conv_window = bits_per_second/3000
 first_conv_window = 30
-second_conv_depth = first_conv_depth/2
+second_conv_depth = int(first_conv_depth/2)
 second_conv_window = 1
 # second_conv_window = bits_per_second/4000
 # thrid_conv_window = bits_per_second/6000
