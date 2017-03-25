@@ -82,6 +82,26 @@ def subpixel_restack(X, n_prime, m_prime=None, name=None):
     return subpixel_restack_impl(X, n_prime, m_prime, name=name)
 
 
+def BatchNorm(T, is_training, scope):
+    # tf.cond takes nullary functions as it's first and second arguments
+    return tf.cond(is_training,
+                   lambda: tf.contrib.layers.batch_norm(T,
+                            decay=0.99,
+                            # zero_debias_moving_mean=True,
+                            is_training=is_training,
+                            center=True, scale=True,
+                            updates_collections=None,
+                            scope=scope,
+                            reuse=False),
+                   lambda: tf.contrib.layers.batch_norm(T,
+                            decay=0.99,
+                            is_training=is_training,
+                            center=True, scale=True,
+                            updates_collections=None,
+                            scope=scope,
+                            reuse=True))
+
+
 def weight_variable(shape, name=None):
     initial = tf.truncated_normal(shape, mean=0.0, stddev=0.1)
     return tf.Variable(initial, name=name)
@@ -176,20 +196,19 @@ def build_downsampling_block(input_tensor,
         if tensorboard_output:
             histogram_variable_summaries(b)
     with tf.name_scope('{}_layer_conv_preactivation'.format(layer_number)):
-        conv = tf.nn.conv1d(input_tensor, W, stride=stride,
-                            padding=padding, name=name) + b
+        l = tf.nn.conv1d(input_tensor, W, stride=stride,
+                         padding=padding, name=name) + b
         if tensorboard_output:
-            histogram_variable_summaries(conv)
-    with tf.name_scope('{}_layer_batch_norm'.format(layer_number)):
-        bnorm = tf.contrib.layers.batch_norm(conv, is_training=is_training)
-        if tensorboard_output:
-            histogram_variable_summaries(bnorm)
+            histogram_variable_summaries(l)
+    with tf.name_scope('{}_layer_batch_norm'.format(layer_number)) as scope:
+        # l = tf.nn.dropout(l, keep_prob=0.25)
+        l = BatchNorm(l, is_training, scope)
     with tf.name_scope('{}_layer_conv_activation'.format(layer_number)):
-        h = act(bnorm, name=name)
+        l = act(l, name=name)
         if tensorboard_output:
-            histogram_variable_summaries(h)
+            histogram_variable_summaries(l)
 
-    return h
+    return l
 
 
 def build_upsampling_block(input_tensor, residual_tensor,
@@ -202,7 +221,7 @@ def build_upsampling_block(input_tensor, residual_tensor,
                            tensorboard_output=False,
                            name=None):
 
-    # assume this layer is twice the depth of the previous layer if no depth
+    # assume this layer is half the depth of the previous layer if no depth
     # information is given
     if depth is None:
         depth = int(input_tensor.get_shape().as_list()[-1]/2)
@@ -218,33 +237,39 @@ def build_upsampling_block(input_tensor, residual_tensor,
         if tensorboard_output:
             histogram_variable_summaries(b)
     with tf.name_scope('{}_layer_conv_preactivation'.format(layer_number)):
-        conv = tf.nn.conv1d(input_tensor, W, stride=1,
-                            padding=padding, name=name) + b
+        l = tf.nn.conv1d(input_tensor, W, stride=1,
+                         padding=padding, name=name) + b
         if tensorboard_output:
-            histogram_variable_summaries(conv)
-    with tf.name_scope('{}_layer_batch_norm'.format(layer_number)):
-        bnorm = tf.contrib.layers.batch_norm(conv, is_training=is_training)
-        if tensorboard_output:
-            histogram_variable_summaries(bnorm)
+            histogram_variable_summaries(l)
+    with tf.name_scope('{}_layer_batch_norm'.format(layer_number)) as scope:
+        # l = tf.nn.dropout(l, keep_prob=0.25)
+        l = BatchNorm(l, is_training, scope)
+        # l = tf.nn.l2_normalize(l, dim=2)
     with tf.name_scope('{}_layer_conv_activation'.format(layer_number)):
-        a = act(bnorm, name=name)
+        l = act(l, name=name)
         if tensorboard_output:
-            histogram_variable_summaries(a)
+            histogram_variable_summaries(l)
     with tf.name_scope('{}_layer_subpixel_reshuffle'.format(layer_number)):
-        dim = subpixel_reshuffle_1D(a,
-                                    residual_tensor.get_shape().as_list()[-1],
-                                    name=name)
+        l = subpixel_reshuffle_1D(l,
+                                  residual_tensor.get_shape().as_list()[-1],
+                                  name=name)
         if tensorboard_output:
-            histogram_variable_summaries(dim)
+            histogram_variable_summaries(l)
+        # print('after residual_tensor: {}'.format(
+        #     residual_tensor.get_shape().as_list()[1:]))
+        # print('after subpixel_reshuffle: {}'.format(
+        #     l.get_shape().as_list()[1:]))
     with tf.name_scope('{}_layer_stacking'.format(layer_number)):
         sliced = tf.slice(residual_tensor,
                           begin=[0, 0, 0],
-                          size=[-1, dim.get_shape().as_list()[1], -1])
-        s = tf.concat((dim, sliced), axis=2, name=name)
+                          size=[-1, l.get_shape().as_list()[1], -1])
+        l = tf.concat((l, sliced), axis=2, name=name)
         if tensorboard_output:
-            histogram_variable_summaries(s)
+            histogram_variable_summaries(l)
+        # print('sliced: {}'.format(sliced.get_shape().as_list()[1:]))
+        # print('after concat: {}'.format(l.get_shape().as_list()[1:]))
 
-    return s
+    return l
 # ######################
 # ######################
 
@@ -422,8 +447,8 @@ def five_layer_conv_model(input_type, input_shape,
 
 
 def deep_residual_network(input_type, input_shape,
-                          number_of_downsample_layers=6,
-                          channel_multiple=4,
+                          number_of_downsample_layers=8,
+                          channel_multiple=8,
                           initial_filter_window=5,
                           initial_stride=2,
                           downsample_filter_window=3,
@@ -437,7 +462,12 @@ def deep_residual_network(input_type, input_shape,
     print('layer summary for {} network'.format(scope_name))
     downsample_layers = []
     upsample_layers = []
+
+    # tf.reset_default_graph()
     with tf.name_scope(scope_name):
+        # training flag
+        train_flag = tf.placeholder(tf.bool)
+
         # input of the model (examples)
         s = [None]
         for i in input_shape:
@@ -452,6 +482,7 @@ def deep_residual_network(input_type, input_shape,
                                       stride=initial_stride,
                                       tensorboard_output=tensorboard_output,
                                       depth=channel_multiple*num_of_channels,
+                                      is_training=train_flag,
                                       layer_number=1)
         print('downsample layer: {}'.format(d1.get_shape().as_list()[1:]))
         downsample_layers.append(d1)
@@ -463,6 +494,7 @@ def deep_residual_network(input_type, input_shape,
                 filter_size=downsample_filter_window,
                 stride=downsample_stride,
                 tensorboard_output=tensorboard_output,
+                is_training=train_flag,
                 layer_number=layer_count)
             print('downsample layer: {}'.format(d.get_shape().as_list()[1:]))
             downsample_layers.append(d)
@@ -472,13 +504,16 @@ def deep_residual_network(input_type, input_shape,
                                       filter_size=bottleneck_filter_window,
                                       stride=bottleneck_stride,
                                       tensorboard_output=tensorboard_output,
+                                      is_training=train_flag,
                                       layer_number=layer_count)
         print('bottleneck layer: {}'.format(bn.get_shape().as_list()[1:]))
         layer_count += 1
 
         u1 = build_upsampling_block(bn, downsample_layers[-1],
+                                    depth=bn.get_shape().as_list()[-1],
                                     filter_size=upsample_filter_window,
                                     tensorboard_output=tensorboard_output,
+                                    is_training=train_flag,
                                     layer_number=layer_count)
         print('upsample layer: {}'.format(u1.get_shape().as_list()[1:]))
         upsample_layers.append(u1)
@@ -489,6 +524,7 @@ def deep_residual_network(input_type, input_shape,
                                        downsample_layers[i],
                                        filter_size=upsample_filter_window,
                                        tensorboard_output=tensorboard_output,
+                                       is_training=train_flag,
                                        layer_number=layer_count)
             print('upsample layer: {}'.format(u.get_shape().as_list()[1:]))
             upsample_layers.append(u)
@@ -506,12 +542,13 @@ def deep_residual_network(input_type, input_shape,
                                    tensorboard_output=tensorboard_output)
         print('final conv layer: {}'.format(conv.get_shape().as_list()[1:]))
 
+        # NOTE this effectively is a linear activation on the last conv layer
         y = subpixel_reshuffle_1D(conv,
                                   num_of_channels)
         y = tf.add(y, x)
         print('output: {}'.format(y.get_shape().as_list()[1:]))
 
-    return x, y
+    return train_flag, x, y
 
 # #################
 # #################

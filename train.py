@@ -1,12 +1,11 @@
-import numpy as np
 import librosa
 from inputs import get_bit_rates_and_waveforms, get_truth_ds_filename_pairs
 from inputs import read_file_pair, randomly_batch
 import tensorflow as tf
-from models import single_fully_connected_model
-from models import three_layer_conv_model, five_layer_conv_model
+from models import deep_residual_network
 
 # Constants describing the training process.
+BATCH_SIZE = 10
 NUM_EPOCHS_PER_DECAY = 500.0      # Epochs after which learning rate decays.
 LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
@@ -36,22 +35,9 @@ true_wf = true_wf.reshape((-1, 1))
 # ################
 
 bits_per_second = true_wf.size/10
-# first_conv_depth = 128
-first_conv_depth = 64
-# first_conv_window = bits_per_second/3000
-first_conv_window = 30
-second_conv_depth = int(first_conv_depth/2)
-second_conv_window = 1
-# second_conv_window = bits_per_second/4000
-# thrid_conv_window = bits_per_second/6000
-thrid_conv_window = 15
 
-# x, model = five_layer_conv_model(true_wf.dtype, true_wf.shape)
-x, model = three_layer_conv_model(true_wf.dtype, true_wf.shape,
-                                  first_conv_window, first_conv_depth,
-                                  second_conv_window, second_conv_depth,
-                                  thrid_conv_window,
-                                  write_tb)
+train_flag, x, model = deep_residual_network(true_wf.dtype, true_wf.shape,
+                                             tensorboard_output=write_tb)
 
 # placeholder for the truth label
 y_true = tf.placeholder(true_wf.dtype,
@@ -91,16 +77,21 @@ with tf.name_scope('learning_rate'):
                                     staircase=True)
 tf.summary.scalar('learning_rate', lr)
 
-with tf.name_scope('train'):
-    # train_step = tf.train.RMSPropOptimizer(lr).minimize(waveform_mse,
-    #                                                     global_step=global_step
-    #                                                     )
-    # train_step = tf.train.GradientDescentOptimizer(1e-2).minimize(waveform_mse)
-    # train_step = tf.train.AdamOptimizer(1e-4,
-    #                                     epsilon=1e-01).minimize(waveform_mse)
-    train_step = tf.train.AdamOptimizer(1e-5,
+
+update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+with tf.control_dependencies(update_ops):
+    # Ensures that we execute the update_ops before performing the train_step
+    # (for batch normalization)
+    with tf.name_scope('train'):
+        # train_step = tf.train.RMSPropOptimizer(lr).minimize(waveform_mse,
+        #                                                     global_step=global_step
+        #                                                     )
+        # train_step = tf.train.GradientDescentOptimizer(1e-2).minimize(waveform_mse)
+        # train_step = tf.train.AdamOptimizer(1e-4,
+        #                                     epsilon=1e-01).minimize(waveform_mse)
+        train_step = tf.train.AdamOptimizer(1e-5,
                                         epsilon=1e-08).minimize(waveform_mse)
-    # train_step = tf.train.AdagradOptimizer(1e-3).minimize(waveform_mse)
+        # train_step = tf.train.AdagradOptimizer(1e-3).minimize(waveform_mse)
 
 # ####################
 # ####################
@@ -127,41 +118,53 @@ sess.run(tf.global_variables_initializer())
 
 val_loss_file = open('val_loss.txt', 'w')
 train_loss_file = open('train_loss.txt', 'w')
-for i in range(50000):
-    batch = randomly_batch(20, train_truth_ds_pairs)
-    if (i + 1) % 100 == 0 or i == 0:
-        vbatch = randomly_batch(1, val_truth_ds_pairs)
-        summary, loss_val = sess.run([merged, waveform_mse],
-                                     feed_dict={x: vbatch[1],
-                                                y_true: vbatch[0]}
-                                     )
-        validation_writer.add_summary(summary, i)
-        val_loss_file.write('{}'.format(loss_val))
+for i in range(60000):
+    batch = randomly_batch(BATCH_SIZE, train_truth_ds_pairs)
+    if (i + 1) % 500 == 0 or i == 0:
+        vbatch = randomly_batch(BATCH_SIZE, val_truth_ds_pairs)
+        loss_val = sess.run([waveform_mse],
+                            feed_dict={train_flag: True,
+                                       x: vbatch[1],
+                                       y_true: vbatch[0]}
+                            )
+        val_loss_file.write('{}\n'.format(loss_val))
         # loss_val = waveform_mse.eval(
         #     feed_dict={x: batch[1],
         #                y_true: batch[0]},
         #     session=sess)
         # print("Step {}, Loss {}".format((i + 1), loss_val))
     if write_tb:
-        summary, _, loss = sess.run([merged, train_step, waveform_mse],
-                                    feed_dict={x: batch[1],
-                                               y_true: batch[0]})
-        train_writer.add_summary(summary, i)
-        train_loss_file.write('{}'.format(loss))
+        if (i + 1) % 500 == 0 or i == 0:
+            summary, _, loss = sess.run([merged, train_step, waveform_mse],
+                                        feed_dict={train_flag: True,
+                                                   x: batch[1],
+                                                   y_true: batch[0]})
+            train_writer.add_summary(summary, i)
+            train_loss_file.write('{}\n'.format(loss))
+            save_path = saver.save(sess,
+                                   "aux/model_checkpoints/{}_{}.ckpt".format(
+                                        model.name, i))
+        else:
+            train_step.run(feed_dict={train_flag: True,
+                                      x: batch[1],
+                                      y_true: batch[0]},
+                           session=sess)
     else:
-        train_step.run(feed_dict={x: batch[1],
+        train_step.run(feed_dict={train_flag: True,
+                                  x: batch[1],
                                   y_true: batch[0]},
                        session=sess)
 
 val_loss_file.close()
 train_loss_file.close()
 # Save the variables to disk.
-save_path = saver.save(sess, "aux/model_checkpoints/{}.ckpt".format(
+save_path = saver.save(sess, "aux/model_checkpoints/{}_final.ckpt".format(
     model.name))
 print("Model checkpoints will be saved in file: {}".format(save_path))
 
 truth, example = read_file_pair(val_truth_ds_pairs[0])
-y_reco = model.eval(feed_dict={x: example.reshape(1, -1, 1)},
+y_reco = model.eval(feed_dict={train_flag: True,
+                               x: example.reshape(1, -1, 1)},
                     session=sess).flatten()
 
 print('difference between truth and example (first 20 elements)')

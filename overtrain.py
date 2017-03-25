@@ -59,7 +59,7 @@ if use_super_simple_model:
                                             write_tb)
 else:
     # x, model = five_layer_conv_model(true_wf.dtype, true_wf.shape)
-    x, model = deep_residual_network(true_wf.dtype, true_wf.shape)
+    train_flag, x, model = deep_residual_network(true_wf.dtype, true_wf.shape)
 
     # x, model = three_layer_conv_with_res_model(true_wf.dtype, true_wf.shape,
     #                                   first_conv_window, first_conv_depth,
@@ -86,6 +86,12 @@ y_true = tf.placeholder(true_wf.dtype,
 
 with tf.name_scope('waveform_mse'):
     waveform_mse = tf.reduce_mean(tf.square(tf.subtract(y_true, model)))
+    # waveform_mse = tf.nn.l2_loss(tf.subtract(y_true, model))
+    # Linf
+    # waveform_mse = tf.reduce_max(tf.abs(tf.subtract(y_true, model)))
+    # log-geometric mean
+    # waveform_mse = tf.exp(tf.reduce_mean(tf.log1p(
+    #   tf.abs(tf.subtract(y_true, model)))))
 tf.summary.scalar('waveform_mse', waveform_mse)
 
 # #############
@@ -110,16 +116,20 @@ with tf.name_scope('learning_rate'):
                                     staircase=True)
 tf.summary.scalar('learning_rate', lr)
 
-with tf.name_scope('train'):
-    # train_step = tf.train.RMSPropOptimizer(lr).minimize(waveform_mse,
-    #                                                     global_step=global_step
-    #                                                     )
-    # train_step = tf.train.GradientDescentOptimizer(1e-2).minimize(waveform_mse)
-    # train_step = tf.train.AdamOptimizer(1e-4,
-    #                                     epsilon=1e-01).minimize(waveform_mse)
-    train_step = tf.train.AdamOptimizer(1e-4,
+update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+with tf.control_dependencies(update_ops):
+    # Ensures that we execute the update_ops before performing the train_step
+    # (for batch normalization)
+    with tf.name_scope('train'):
+        # train_step = tf.train.RMSPropOptimizer(lr).minimize(waveform_mse,
+        #                                                     global_step=global_step
+        #                                                     )
+        # train_step = tf.train.GradientDescentOptimizer(1e-2).minimize(waveform_mse)
+        # train_step = tf.train.AdamOptimizer(1e-4,
+        #                                     epsilon=1e-01).minimize(waveform_mse)
+        train_step = tf.train.AdamOptimizer(1e-4,
                                         epsilon=1e-08).minimize(waveform_mse)
-    # train_step = tf.train.AdagradOptimizer(1e-3).minimize(waveform_mse)
+        # train_step = tf.train.AdagradOptimizer(1e-3).minimize(waveform_mse)
 
 # ####################
 # ####################
@@ -147,13 +157,19 @@ example = example[:waveform_max]
 truth_batch = []
 example_batch = []
 
-batch_size = 5
+batch_size = 10
 for i in range(batch_size):
     truth_batch.append(truth)
     example_batch.append(example)
-print('loss score of example {}'.format(np.mean((truth-example)**2)))
+
+example_loss = np.mean((truth-example)**2)
+# example_loss = 0.5*np.sum((truth-example)**2)
+# example_loss = np.max(np.abs(truth-example))
+# example_loss = np.exp(np.mean(np.log1p(np.abs(truth-example))))
+print('loss score of example {}'.format(example_loss))
+train_loss_file = open('overtrain_loss.txt', 'w')
+# for i in range(93000):
 for i in range(10000):
-    # if (i + 1) % 1 == 0 or i == 0:
     if (i + 1) % 100 == 0 or i == 0:
         # summary, loss_val = sess.run([merged, waveform_mse],
         #             feed_dict={x: example.reshape(1, -1, 1),
@@ -161,21 +177,42 @@ for i in range(10000):
         # )
         # validation_writer.add_summary(summary, i)
         loss_val = waveform_mse.eval(
-            feed_dict={x: example.reshape(1, -1, 1),
-                       y_true: truth.reshape(1, -1, 1)},
-            session=sess)
-        print("Epoch {}, Loss {}".format((i + 1), loss_val))
+            feed_dict={train_flag: True,
+                       x: example_batch,
+                       y_true: truth_batch},
+                    #    x: example.reshape(1, -1, 1),
+                    #    y_true: truth.reshape(1, -1, 1)},
+            session=sess)#/float(batch_size)
+        if loss_val <= example_loss:
+            loss_val = waveform_mse.eval(
+                # feed_dict={train_flag: False,
+                feed_dict={train_flag: True,
+                           x: example_batch,
+                           y_true: truth_batch},
+                        #    x: example.reshape(1, -1, 1),
+                        #    y_true: truth.reshape(1, -1, 1)},
+                session=sess)#/float(batch_size)
+            print("Epoch {}, Loss {}".format((i + 1), loss_val))
+            train_loss_file.write('{}\n'.format(loss_val))
+        else:
+            print("Epoch {}, (Fake) Loss {}".format((i + 1), loss_val))
     if write_tb:
         summary, _ = sess.run([merged, train_step],
-                              feed_dict={x: example_batch,
+                              feed_dict={train_flag: True,
+                                         x: example_batch,
                                          y_true: truth_batch})
         train_writer.add_summary(summary, i)
     else:
-        train_step.run(feed_dict={x: example_batch,
+        train_step.run(feed_dict={train_flag: True,
+                                  x: example_batch,
                                   y_true: truth_batch},
                        session=sess)
 
-y_reco = model.eval(feed_dict={x: example.reshape(1, -1, 1)},
+train_loss_file.close()
+
+# y_reco = model.eval(feed_dict={train_flag: False,
+y_reco = model.eval(feed_dict={train_flag: True,
+                               x: example.reshape(1, -1, 1)},
                     session=sess).flatten()
 
 print('difference between truth and example (first 20 elements)')
