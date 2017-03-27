@@ -545,7 +545,7 @@ def deep_residual_network(input_type, input_shape,
         # NOTE this effectively is a linear activation on the last conv layer
         y = subpixel_reshuffle_1D(conv,
                                   num_of_channels)
-        y = tf.add(y, x)
+        y = tf.add(y, x, name=scope_name)
         print('output: {}'.format(y.get_shape().as_list()[1:]))
 
     return train_flag, x, y

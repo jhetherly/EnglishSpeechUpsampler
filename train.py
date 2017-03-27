@@ -1,3 +1,4 @@
+import numpy as np
 import librosa
 from inputs import get_bit_rates_and_waveforms, get_truth_ds_filename_pairs
 from inputs import read_file_pair, randomly_batch
@@ -107,7 +108,7 @@ sess = tf.Session()
 merged = tf.summary.merge_all()
 train_writer = tf.summary.FileWriter('aux/tensorboard/train',
                                      sess.graph)
-validation_writer = tf.summary.FileWriter('aux/tensorboard/validation')
+# validation_writer = tf.summary.FileWriter('aux/tensorboard/validation')
 
 # initialize the variables for the session
 sess.run(tf.global_variables_initializer())
@@ -116,18 +117,20 @@ sess.run(tf.global_variables_initializer())
 # TRAINING LOOP
 # #############
 
+model_name = model.name.replace('/', '_').replace(':', '_')
 val_loss_file = open('val_loss.txt', 'w')
 train_loss_file = open('train_loss.txt', 'w')
-for i in range(60000):
+for i in range(24000):
     batch = randomly_batch(BATCH_SIZE, train_truth_ds_pairs)
     if (i + 1) % 500 == 0 or i == 0:
         vbatch = randomly_batch(BATCH_SIZE, val_truth_ds_pairs)
         loss_val = sess.run([waveform_mse],
-                            feed_dict={train_flag: True,
+                            feed_dict={train_flag: False,
                                        x: vbatch[1],
                                        y_true: vbatch[0]}
                             )
-        val_loss_file.write('{}\n'.format(loss_val))
+        val_loss_file.write('{}\n'.format(np.mean(loss_val)))
+        print("Iteration {}, Val Loss {}".format((i + 1), loss_val))
         # loss_val = waveform_mse.eval(
         #     feed_dict={x: batch[1],
         #                y_true: batch[0]},
@@ -143,27 +146,23 @@ for i in range(60000):
             train_loss_file.write('{}\n'.format(loss))
             save_path = saver.save(sess,
                                    "aux/model_checkpoints/{}_{}.ckpt".format(
-                                        model.name, i))
-        else:
-            train_step.run(feed_dict={train_flag: True,
-                                      x: batch[1],
-                                      y_true: batch[0]},
-                           session=sess)
-    else:
-        train_step.run(feed_dict={train_flag: True,
-                                  x: batch[1],
-                                  y_true: batch[0]},
-                       session=sess)
+                                        model_name, i))
+            print("Iteration {}, Loss {}".format((i + 1), loss))
+
+    train_step.run(feed_dict={train_flag: True,
+                              x: batch[1],
+                              y_true: batch[0]},
+                   session=sess)
 
 val_loss_file.close()
 train_loss_file.close()
 # Save the variables to disk.
 save_path = saver.save(sess, "aux/model_checkpoints/{}_final.ckpt".format(
-    model.name))
+    model_name))
 print("Model checkpoints will be saved in file: {}".format(save_path))
 
 truth, example = read_file_pair(val_truth_ds_pairs[0])
-y_reco = model.eval(feed_dict={train_flag: True,
+y_reco = model.eval(feed_dict={train_flag: False,
                                x: example.reshape(1, -1, 1)},
                     session=sess).flatten()
 
