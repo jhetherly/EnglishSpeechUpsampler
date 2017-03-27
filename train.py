@@ -130,12 +130,7 @@ for i in range(24000):
                                        y_true: vbatch[0]}
                             )
         val_loss_file.write('{}\n'.format(np.mean(loss_val)))
-        print("Iteration {}, Val Loss {}".format((i + 1), loss_val))
-        # loss_val = waveform_mse.eval(
-        #     feed_dict={x: batch[1],
-        #                y_true: batch[0]},
-        #     session=sess)
-        # print("Step {}, Loss {}".format((i + 1), loss_val))
+        print("Iteration {}, Val Loss {}".format((i + 1), np.mean(loss_val)))
     if write_tb:
         if (i + 1) % 500 == 0 or i == 0:
             summary, _, loss = sess.run([merged, train_step, waveform_mse],
@@ -161,7 +156,7 @@ save_path = saver.save(sess, "aux/model_checkpoints/{}_final.ckpt".format(
     model_name))
 print("Model checkpoints will be saved in file: {}".format(save_path))
 
-truth, example = read_file_pair(val_truth_ds_pairs[0])
+truth, example = read_file_pair(val_truth_ds_pairs[1])
 y_reco = model.eval(feed_dict={train_flag: False,
                                x: example.reshape(1, -1, 1)},
                     session=sess).flatten()
