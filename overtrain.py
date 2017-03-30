@@ -4,20 +4,18 @@ from inputs import get_bit_rates_and_waveforms, get_truth_ds_filename_pairs
 from inputs import read_file_pair
 import tensorflow as tf
 from models import single_fully_connected_model
-from models import three_layer_conv_model, five_layer_conv_model
-from models import three_layer_conv_with_res_model
 from models import deep_residual_network
 
 
 # Constants describing the training process.
-NUM_EPOCHS_PER_DECAY = 500.0      # Epochs after which learning rate decays.
+NUM_EPOCHS_PER_DECAY = 50.0      # Epochs after which learning rate decays.
 LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
-INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
+INITIAL_LEARNING_RATE = 0.001       # Initial learning rate.
 
 example_number = 0
 use_super_simple_model = False
 waveform_reduction_factor = 1
-write_tb = False
+write_tb = True
 file_name_lists_dir = '/home/paperspace/Documents/EnglishSpeechUpsampler/aux'
 
 
@@ -109,11 +107,16 @@ decay_steps = int(num_batches_per_epoch * NUM_EPOCHS_PER_DECAY)
 # Decay the learning rate exponentially based on the number of steps.
 global_step = tf.Variable(0, trainable=False)
 with tf.name_scope('learning_rate'):
-    lr = tf.train.exponential_decay(INITIAL_LEARNING_RATE,
-                                    global_step,
-                                    decay_steps,
-                                    LEARNING_RATE_DECAY_FACTOR,
-                                    staircase=True)
+    # lr = tf.train.exponential_decay(INITIAL_LEARNING_RATE,
+    #                                 global_step,
+    #                                 decay_steps,
+    #                                 LEARNING_RATE_DECAY_FACTOR,
+    #                                 staircase=True)
+    lr = tf.train.inverse_time_decay(INITIAL_LEARNING_RATE,
+                                     global_step,
+                                     decay_steps,
+                                     LEARNING_RATE_DECAY_FACTOR,
+                                     staircase=False)
 tf.summary.scalar('learning_rate', lr)
 
 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
@@ -127,8 +130,10 @@ with tf.control_dependencies(update_ops):
         # train_step = tf.train.GradientDescentOptimizer(1e-2).minimize(waveform_mse)
         # train_step = tf.train.AdamOptimizer(1e-4,
         #                                     epsilon=1e-01).minimize(waveform_mse)
-        train_step = tf.train.AdamOptimizer(1e-4,
-                                        epsilon=1e-08).minimize(waveform_mse)
+        # train_step = tf.train.AdamOptimizer(1e-4,
+        #                                 epsilon=1e-08).minimize(waveform_mse)
+        train_step = tf.train.AdamOptimizer(lr,
+                epsilon=1e-08).minimize(waveform_mse, global_step=global_step)
         # train_step = tf.train.AdagradOptimizer(1e-3).minimize(waveform_mse)
 
 # ####################
@@ -140,7 +145,7 @@ sess = tf.Session()
 
 # initialize tensorboard file writers
 merged = tf.summary.merge_all()
-train_writer = tf.summary.FileWriter('aux/tensorboard/train',
+train_writer = tf.summary.FileWriter('aux/tensorboard/overtrain',
                                      sess.graph)
 # validation_writer = tf.summary.FileWriter('aux/tensorboard/validation')
 
@@ -151,13 +156,15 @@ sess.run(tf.global_variables_initializer())
 # TRAINING LOOP
 # #############
 
+print(train_truth_ds_pairs[example_number])
+exit()
 truth, example = read_file_pair(train_truth_ds_pairs[example_number])
 truth = truth[:waveform_max]
 example = example[:waveform_max]
 truth_batch = []
 example_batch = []
 
-batch_size = 10
+batch_size = 32
 for i in range(batch_size):
     truth_batch.append(truth)
     example_batch.append(example)
@@ -180,23 +187,10 @@ for i in range(10000):
             feed_dict={train_flag: True,
                        x: example_batch,
                        y_true: truth_batch},
-                    #    x: example.reshape(1, -1, 1),
-                    #    y_true: truth.reshape(1, -1, 1)},
-            session=sess)#/float(batch_size)
-        if loss_val <= example_loss:
-            loss_val = waveform_mse.eval(
-                # feed_dict={train_flag: False,
-                feed_dict={train_flag: True,
-                           x: example_batch,
-                           y_true: truth_batch},
-                        #    x: example.reshape(1, -1, 1),
-                        #    y_true: truth.reshape(1, -1, 1)},
-                session=sess)#/float(batch_size)
-            print("Epoch {}, Loss {}".format((i + 1), loss_val))
-            train_loss_file.write('{}\n'.format(loss_val))
-        else:
-            print("Epoch {}, (Fake) Loss {}".format((i + 1), loss_val))
-    if write_tb:
+            session=sess)  # /float(batch_size)
+        print("Epoch {}, Loss {}".format((i + 1), loss_val))
+        train_loss_file.write('{}\n'.format(loss_val))
+    if write_tb and ((i + 1) % 500 == 0 or i == 0):
         summary, _ = sess.run([merged, train_step],
                               feed_dict={train_flag: True,
                                          x: example_batch,
@@ -210,7 +204,6 @@ for i in range(10000):
 
 train_loss_file.close()
 
-# y_reco = model.eval(feed_dict={train_flag: False,
 y_reco = model.eval(feed_dict={train_flag: True,
                                x: example.reshape(1, -1, 1)},
                     session=sess).flatten()

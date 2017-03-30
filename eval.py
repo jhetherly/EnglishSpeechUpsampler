@@ -7,7 +7,7 @@ import tensorflow as tf
 from models import deep_residual_network
 
 # Constants describing the training process.
-BATCH_SIZE = 10
+BATCH_SIZE = 16
 
 waveform_reduction_factor = 1
 file_name_lists_dir = '/home/paperspace/Documents/EnglishSpeechUpsampler/aux'
@@ -83,8 +83,6 @@ for pair in next_batch(BATCH_SIZE, test_truth_ds_pairs):
     test_loss_file.write('{}\n'.format(np.mean(loss_test)))
     print("Iteration {}, Test Loss {}".format((count + 1), loss_test))
     count += 1
-    if count >= 3:
-        break
 
 test_loss_file.close()
 

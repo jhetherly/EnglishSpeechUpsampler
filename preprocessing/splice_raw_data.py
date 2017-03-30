@@ -4,7 +4,7 @@ import sox
 input_dir_name_base = '/home/paperspace/Documents' +\
                       '/TEDLIUM/TEDLIUM_release2/{}/sph'
 input_dir_name_dirs = ['dev', 'test', 'train']
-duration_chunks = 10  # in seconds
+duration_chunks = 2  # in seconds
 start_time = 30  # in seconds
 end_time = -30  # in seconds
 downsample_rate = 4000  # in kbps

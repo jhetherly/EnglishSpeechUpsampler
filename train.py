@@ -6,7 +6,7 @@ import tensorflow as tf
 from models import deep_residual_network
 
 # Constants describing the training process.
-BATCH_SIZE = 10
+BATCH_SIZE = 16
 NUM_EPOCHS_PER_DECAY = 500.0      # Epochs after which learning rate decays.
 LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
@@ -90,7 +90,7 @@ with tf.control_dependencies(update_ops):
         # train_step = tf.train.GradientDescentOptimizer(1e-2).minimize(waveform_mse)
         # train_step = tf.train.AdamOptimizer(1e-4,
         #                                     epsilon=1e-01).minimize(waveform_mse)
-        train_step = tf.train.AdamOptimizer(1e-5,
+        train_step = tf.train.AdamOptimizer(1e-4,
                                         epsilon=1e-08).minimize(waveform_mse)
         # train_step = tf.train.AdagradOptimizer(1e-3).minimize(waveform_mse)
 
@@ -120,7 +120,7 @@ sess.run(tf.global_variables_initializer())
 model_name = model.name.replace('/', '_').replace(':', '_')
 val_loss_file = open('val_loss.txt', 'w')
 train_loss_file = open('train_loss.txt', 'w')
-for i in range(24000):
+for i in range(45000):  # 36 hours
     batch = randomly_batch(BATCH_SIZE, train_truth_ds_pairs)
     if (i + 1) % 500 == 0 or i == 0:
         vbatch = randomly_batch(BATCH_SIZE, val_truth_ds_pairs)
@@ -129,7 +129,8 @@ for i in range(24000):
                                        x: vbatch[1],
                                        y_true: vbatch[0]}
                             )
-        val_loss_file.write('{}\n'.format(np.mean(loss_val)))
+        val_loss_file.write('{}, {}\n'.format(BATCH_SIZE*(i + 1),
+                                              np.mean(loss_val)))
         print("Iteration {}, Val Loss {}".format((i + 1), np.mean(loss_val)))
     if write_tb:
         if (i + 1) % 500 == 0 or i == 0:
@@ -138,7 +139,7 @@ for i in range(24000):
                                                    x: batch[1],
                                                    y_true: batch[0]})
             train_writer.add_summary(summary, i)
-            train_loss_file.write('{}\n'.format(loss))
+            train_loss_file.write('{}, {}\n'.format(BATCH_SIZE*(i + 1), loss))
             save_path = saver.save(sess,
                                    "aux/model_checkpoints/{}_{}.ckpt".format(
                                         model_name, i))
