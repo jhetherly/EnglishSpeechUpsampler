@@ -1,12 +1,14 @@
 import numpy as np
 import librosa
 from inputs import get_bit_rates_and_waveforms, get_truth_ds_filename_pairs
-from inputs import read_file_pair, randomly_batch
+from inputs import read_file_pair, randomly_batch, next_batch
 import tensorflow as tf
 from models import deep_residual_network
 
 # Constants describing the training process.
 BATCH_SIZE = 16
+# SAMPLES_PER_EPOCH = 364725        # Number of training samples per epoch
+NUMBER_OF_EPOCHS = 2              # Number of epochs to train
 NUM_EPOCHS_PER_DECAY = 500.0      # Epochs after which learning rate decays.
 LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
@@ -29,6 +31,7 @@ waveform_max = int(true_wf.size/waveform_reduction_factor)
 true_wf = true_wf[:waveform_max]
 # reshape for mono waveforms
 true_wf = true_wf.reshape((-1, 1))
+SAMPLES_PER_EPOCH = len(train_truth_ds_pairs)
 
 
 # ################
@@ -120,35 +123,52 @@ sess.run(tf.global_variables_initializer())
 model_name = model.name.replace('/', '_').replace(':', '_')
 val_loss_file = open('val_loss.txt', 'w')
 train_loss_file = open('train_loss.txt', 'w')
-for i in range(45000):  # 36 hours
+epoch_scale = int(SAMPLES_PER_EPOCH/BATCH_SIZE)
+for i in range(NUMBER_OF_EPOCHS*epoch_scale):
+    is_new_epoch = ((i + 1) % epoch_scale == 0)
+    if is_new_epoch:
+        epoch_num = int((i + 1) / epoch_scale)
+    if is_new_epoch:
+        print('Calculating validation loss ({} iterations)'.format(
+            len(val_truth_ds_pairs)/BATCH_SIZE))
+        total_val_loss = 0
+        val_count = 0
+        for pair in next_batch(BATCH_SIZE, val_truth_ds_pairs):
+            loss_val = sess.run([waveform_mse],
+                                feed_dict={train_flag: False,
+                                           x: pair[1],
+                                           y_true: pair[0]}
+                                )
+            total_val_loss += np.mean(loss_val)
+            val_count += 1
+        val_loss_file.write('{},{}\n'.format(epoch_num,
+                                             total_val_loss/val_count))
+        print("Epoch {}, Val Loss {}".format(epoch_num,
+                                             np.mean(loss_val)))
     batch = randomly_batch(BATCH_SIZE, train_truth_ds_pairs)
-    if (i + 1) % 500 == 0 or i == 0:
-        vbatch = randomly_batch(BATCH_SIZE, val_truth_ds_pairs)
-        loss_val = sess.run([waveform_mse],
-                            feed_dict={train_flag: False,
-                                       x: vbatch[1],
-                                       y_true: vbatch[0]}
-                            )
-        val_loss_file.write('{}, {}\n'.format(BATCH_SIZE*(i + 1),
-                                              np.mean(loss_val)))
-        print("Iteration {}, Val Loss {}".format((i + 1), np.mean(loss_val)))
     if write_tb:
-        if (i + 1) % 500 == 0 or i == 0:
+        if is_new_epoch:
             summary, _, loss = sess.run([merged, train_step, waveform_mse],
                                         feed_dict={train_flag: True,
                                                    x: batch[1],
                                                    y_true: batch[0]})
             train_writer.add_summary(summary, i)
-            train_loss_file.write('{}, {}\n'.format(BATCH_SIZE*(i + 1), loss))
+            train_loss_file.write('{}, {}\n'.format(epoch_num, loss))
             save_path = saver.save(sess,
                                    "aux/model_checkpoints/{}_{}.ckpt".format(
-                                        model_name, i))
-            print("Iteration {}, Loss {}".format((i + 1), loss))
+                                        model_name, epoch_num))
+            print("Epoch {}, Loss {}".format(epoch_num, loss))
 
     train_step.run(feed_dict={train_flag: True,
                               x: batch[1],
                               y_true: batch[0]},
                    session=sess)
+    if (i + 1) % 500 == 0 and not is_new_epoch:
+        loss = np.mean(sess.run([waveform_mse],
+                                feed_dict={train_flag: True,
+                                           x: batch[1],
+                                           y_true: batch[0]}))
+        print("Iteration {}, Loss {}".format(i + 1, loss))
 
 val_loss_file.close()
 train_loss_file.close()

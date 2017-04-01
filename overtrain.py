@@ -15,15 +15,15 @@ INITIAL_LEARNING_RATE = 0.001       # Initial learning rate.
 example_number = 0
 use_super_simple_model = False
 waveform_reduction_factor = 1
-write_tb = True
+write_tb = False
 file_name_lists_dir = '/home/paperspace/Documents/EnglishSpeechUpsampler/aux'
 
 
 train_truth_ds_pairs = get_truth_ds_filename_pairs(file_name_lists_dir,
                                                    'train')
-val_truth_ds_pairs = get_truth_ds_filename_pairs(file_name_lists_dir,
-                                                 'validation')
 
+print(len(train_truth_ds_pairs))
+exit()
 br_pairs, wf_pairs = get_bit_rates_and_waveforms(train_truth_ds_pairs[0])
 true_br = br_pairs[0]
 true_wf = wf_pairs[0]
@@ -140,6 +140,9 @@ with tf.control_dependencies(update_ops):
 # ####################
 
 
+# Add ops to save and restore all the variables.
+saver = tf.train.Saver()
+
 # create session
 sess = tf.Session()
 
@@ -147,17 +150,15 @@ sess = tf.Session()
 merged = tf.summary.merge_all()
 train_writer = tf.summary.FileWriter('aux/tensorboard/overtrain',
                                      sess.graph)
-# validation_writer = tf.summary.FileWriter('aux/tensorboard/validation')
 
 # initialize the variables for the session
 sess.run(tf.global_variables_initializer())
+
 
 # #############
 # TRAINING LOOP
 # #############
 
-print(train_truth_ds_pairs[example_number])
-exit()
 truth, example = read_file_pair(train_truth_ds_pairs[example_number])
 truth = truth[:waveform_max]
 example = example[:waveform_max]
@@ -176,13 +177,8 @@ example_loss = np.mean((truth-example)**2)
 print('loss score of example {}'.format(example_loss))
 train_loss_file = open('overtrain_loss.txt', 'w')
 # for i in range(93000):
-for i in range(10000):
+for i in range(5000):
     if (i + 1) % 100 == 0 or i == 0:
-        # summary, loss_val = sess.run([merged, waveform_mse],
-        #             feed_dict={x: example.reshape(1, -1, 1),
-        #                        y_true: truth.reshape(1, -1, 1)}
-        # )
-        # validation_writer.add_summary(summary, i)
         loss_val = waveform_mse.eval(
             feed_dict={train_flag: True,
                        x: example_batch,
@@ -202,6 +198,8 @@ for i in range(10000):
                                   y_true: truth_batch},
                        session=sess)
 
+save_path = saver.save(sess, "aux/model_checkpoints/overtrain_final.ckpt")
+print("Model checkpoints will be saved in file: {}".format(save_path))
 train_loss_file.close()
 
 y_reco = model.eval(feed_dict={train_flag: True,

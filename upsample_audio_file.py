@@ -6,7 +6,7 @@ import tensorflow as tf
 from models import deep_residual_network
 
 KBPS = 16000
-SECONDS_PER_INPUT = 10  # must match restored model
+SECONDS_PER_INPUT = 2  # must match restored model
 # SECONDS_PER_INPUT = 2
 INPUT_SIZE = KBPS*SECONDS_PER_INPUT
 OUTPUT_LENGTH = 20*KBPS  # in bits
@@ -23,8 +23,9 @@ file_name = os.path.join(source_dir, file_name_base)
 
 file_name_lists_dir = '/home/paperspace/Documents/EnglishSpeechUpsampler/aux'
 model_checkpoint_file_name = os.path.join(file_name_lists_dir,
-                                    'model_checkpoints/' +\
-                                    'deep_residual_deep_residual_0_final.ckpt')
+                                          'model_checkpoints/' +
+                                          'overtrain_final.ckpt')
+                                # 'deep_residual_deep_residual_0_final.ckpt')
 
 
 true_wf, true_br = librosa.load(file_name, sr=None, mono=True)
