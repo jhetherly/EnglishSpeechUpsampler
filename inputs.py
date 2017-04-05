@@ -54,6 +54,30 @@ def get_truth_ds_filename_pairs(directory, dataset='train'):
     return result
 
 
+def get_selected_truth_ds_filename_pairs(directory, selected_files_list,
+                                         dataset='train'):
+    """
+    returns a list of selected file name pairs that represent:
+    ["true waveform", "downsampled waveform"]
+
+    directory is a string representing directory of the csv files containing
+    the actual file name pairs
+    selected_files_list is a list of file name tags to match
+    dataset is one of "train," "test," or "validation"
+    """
+    result = []
+    with open(os.path.join(directory,
+              '{}_files.csv'.format(dataset)), 'rb') as csvfile:
+        spamreader = csv.reader(csvfile)
+        for row in spamreader:
+            for file_tag in selected_files_list:
+                if file_tag in row[0]:
+                    result.append(row)
+                    break
+
+    return result
+
+
 def read_file_pair(filename_pair, mono=True):
     """
     given a pair of file names, read in both waveforms and upsample (through

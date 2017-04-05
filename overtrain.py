@@ -1,6 +1,8 @@
 import numpy as np
 import librosa
-from inputs import get_bit_rates_and_waveforms, get_truth_ds_filename_pairs
+from inputs import get_bit_rates_and_waveforms
+from inputs import get_selected_truth_ds_filename_pairs
+from inputs import randomly_batch, next_batch
 from inputs import read_file_pair
 import tensorflow as tf
 from models import single_fully_connected_model
@@ -8,6 +10,8 @@ from models import deep_residual_network
 
 
 # Constants describing the training process.
+BATCH_SIZE = 64
+NUMBER_OF_EPOCHS = 900              # Number of epochs to train
 NUM_EPOCHS_PER_DECAY = 50.0      # Epochs after which learning rate decays.
 LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 0.001       # Initial learning rate.
@@ -17,13 +21,21 @@ use_super_simple_model = False
 waveform_reduction_factor = 1
 write_tb = False
 file_name_lists_dir = '/home/paperspace/Documents/EnglishSpeechUpsampler/aux'
+# selected_files = ['BillGates_2010']
+selected_files = ['RobertGupta_2010U']
 
 
-train_truth_ds_pairs = get_truth_ds_filename_pairs(file_name_lists_dir,
-                                                   'train')
+train_truth_ds_pairs = get_selected_truth_ds_filename_pairs(
+    file_name_lists_dir, selected_files, 'train')
+temp_addition = get_selected_truth_ds_filename_pairs(
+    file_name_lists_dir, selected_files, 'validation')
+if len(temp_addition) > 0:
+    train_truth_ds_pairs = train_truth_ds_pairs + temp_addition
+temp_addition = get_selected_truth_ds_filename_pairs(
+    file_name_lists_dir, selected_files, 'test')
+if len(temp_addition) > 0:
+    train_truth_ds_pairs = train_truth_ds_pairs + temp_addition
 
-print(len(train_truth_ds_pairs))
-exit()
 br_pairs, wf_pairs = get_bit_rates_and_waveforms(train_truth_ds_pairs[0])
 true_br = br_pairs[0]
 true_wf = wf_pairs[0]
@@ -32,6 +44,8 @@ waveform_max = int(true_wf.size/waveform_reduction_factor)
 true_wf = true_wf[:waveform_max]
 # reshape for mono waveforms
 true_wf = true_wf.reshape((-1, 1))
+SAMPLES_PER_EPOCH = len(train_truth_ds_pairs)
+print('Samples per epoch: {}'.format(SAMPLES_PER_EPOCH))
 
 
 # ################
@@ -130,10 +144,10 @@ with tf.control_dependencies(update_ops):
         # train_step = tf.train.GradientDescentOptimizer(1e-2).minimize(waveform_mse)
         # train_step = tf.train.AdamOptimizer(1e-4,
         #                                     epsilon=1e-01).minimize(waveform_mse)
-        # train_step = tf.train.AdamOptimizer(1e-4,
-        #                                 epsilon=1e-08).minimize(waveform_mse)
-        train_step = tf.train.AdamOptimizer(lr,
-                epsilon=1e-08).minimize(waveform_mse, global_step=global_step)
+        train_step = tf.train.AdamOptimizer(1e-4,
+                                        epsilon=1e-08).minimize(waveform_mse)
+        # train_step = tf.train.AdamOptimizer(lr,
+        #         epsilon=1e-08).minimize(waveform_mse, global_step=global_step)
         # train_step = tf.train.AdagradOptimizer(1e-3).minimize(waveform_mse)
 
 # ####################
@@ -159,48 +173,78 @@ sess.run(tf.global_variables_initializer())
 # TRAINING LOOP
 # #############
 
-truth, example = read_file_pair(train_truth_ds_pairs[example_number])
-truth = truth[:waveform_max]
-example = example[:waveform_max]
-truth_batch = []
-example_batch = []
+example_loss = 0.0
+example_loss_count = 0
+for truth, example in next_batch(1, train_truth_ds_pairs):
+    example_loss += np.mean((truth[0].flatten()-example[0].flatten())**2)
+    example_loss_count += 1
+example_loss = example_loss/float(example_loss_count)
+# truth, example = read_file_pair(train_truth_ds_pairs[example_number])
+# truth = truth[:waveform_max]
+# example = example[:waveform_max]
+# truth_batch = []
+# example_batch = []
+#
+# for i in range(BATCH_SIZE):
+#     truth_batch.append(truth)
+#     example_batch.append(example)
 
-batch_size = 32
-for i in range(batch_size):
-    truth_batch.append(truth)
-    example_batch.append(example)
-
-example_loss = np.mean((truth-example)**2)
+# example_loss = np.mean((truth-example)**2)
 # example_loss = 0.5*np.sum((truth-example)**2)
 # example_loss = np.max(np.abs(truth-example))
 # example_loss = np.exp(np.mean(np.log1p(np.abs(truth-example))))
 print('loss score of example {}'.format(example_loss))
 train_loss_file = open('overtrain_loss.txt', 'w')
-# for i in range(93000):
-for i in range(5000):
-    if (i + 1) % 100 == 0 or i == 0:
-        loss_val = waveform_mse.eval(
-            feed_dict={train_flag: True,
-                       x: example_batch,
-                       y_true: truth_batch},
-            session=sess)  # /float(batch_size)
-        print("Epoch {}, Loss {}".format((i + 1), loss_val))
-        train_loss_file.write('{}\n'.format(loss_val))
-    if write_tb and ((i + 1) % 500 == 0 or i == 0):
-        summary, _ = sess.run([merged, train_step],
-                              feed_dict={train_flag: True,
-                                         x: example_batch,
-                                         y_true: truth_batch})
-        train_writer.add_summary(summary, i)
-    else:
+for i in range(NUMBER_OF_EPOCHS):
+    for pair in next_batch(BATCH_SIZE, train_truth_ds_pairs):
         train_step.run(feed_dict={train_flag: True,
-                                  x: example_batch,
-                                  y_true: truth_batch},
+                                  x: pair[1],
+                                  y_true: pair[0]},
                        session=sess)
+    batch = randomly_batch(BATCH_SIZE, train_truth_ds_pairs)
+    loss_val = waveform_mse.eval(
+        feed_dict={train_flag: False,
+                   x: batch[1],
+                   y_true: batch[0]},
+        session=sess)
+    print("Epoch {}, Loss {}".format((i + 1), loss_val))
+    train_loss_file.write('{}\n'.format(loss_val))
+    if write_tb:
+        summary = sess.run([merged],
+                           feed_dict={train_flag: True,
+                                      x: batch[1],
+                                      y_true: batch[0]})
+        train_writer.add_summary(summary, i)
+
+# for i in range(93000):
+# for i in range(5000):
+#     if (i + 1) % 100 == 0 or i == 0:
+#         loss_val = waveform_mse.eval(
+#             feed_dict={train_flag: True,
+#                        x: example_batch,
+#                        y_true: truth_batch},
+#             session=sess)  # /float(batch_size)
+#         print("Epoch {}, Loss {}".format((i + 1), loss_val))
+#         train_loss_file.write('{}\n'.format(loss_val))
+#     if write_tb and ((i + 1) % 500 == 0 or i == 0):
+#         summary, _ = sess.run([merged, train_step],
+#                               feed_dict={train_flag: True,
+#                                          x: example_batch,
+#                                          y_true: truth_batch})
+#         train_writer.add_summary(summary, i)
+#     else:
+#         train_step.run(feed_dict={train_flag: True,
+#                                   x: example_batch,
+#                                   y_true: truth_batch},
+#                        session=sess)
 
 save_path = saver.save(sess, "aux/model_checkpoints/overtrain_final.ckpt")
 print("Model checkpoints will be saved in file: {}".format(save_path))
 train_loss_file.close()
+
+truth, example = read_file_pair(train_truth_ds_pairs[example_number])
+truth = truth[:waveform_max]
+example = example[:waveform_max]
 
 y_reco = model.eval(feed_dict={train_flag: True,
                                x: example.reshape(1, -1, 1)},

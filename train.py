@@ -6,12 +6,15 @@ import tensorflow as tf
 from models import deep_residual_network
 
 # Constants describing the training process.
-BATCH_SIZE = 16
+BATCH_SIZE = 64
 # SAMPLES_PER_EPOCH = 364725        # Number of training samples per epoch
-NUMBER_OF_EPOCHS = 2              # Number of epochs to train
-NUM_EPOCHS_PER_DECAY = 500.0      # Epochs after which learning rate decays.
-LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
-INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
+NUMBER_OF_EPOCHS = 650              # Number of epochs to train
+# REDUCTION_FACTOR = 1.0              # Factor by which to reduce the number of
+REDUCTION_FACTOR = 0.001            # Factor by which to reduce the number of
+                                    # samples per epoch
+NUM_EPOCHS_PER_DECAY = 500.0        # Epochs after which learning rate decays.
+LEARNING_RATE_DECAY_FACTOR = 0.1    # Learning rate decay factor.
+INITIAL_LEARNING_RATE = 0.1         # Initial learning rate.
 
 waveform_reduction_factor = 1
 write_tb = True
@@ -22,6 +25,18 @@ train_truth_ds_pairs = get_truth_ds_filename_pairs(file_name_lists_dir,
                                                    'train')
 val_truth_ds_pairs = get_truth_ds_filename_pairs(file_name_lists_dir,
                                                  'validation')
+
+
+def reduce_dataset(pairs, reduction_factor):
+    return np.array(pairs)[
+        np.random.choice(range(len(pairs)), int(reduction_factor*len(pairs)))]
+
+
+if REDUCTION_FACTOR != 1.0:
+    train_truth_ds_pairs = reduce_dataset(train_truth_ds_pairs,
+                                          REDUCTION_FACTOR)
+    val_truth_ds_pairs = reduce_dataset(val_truth_ds_pairs,
+                                        REDUCTION_FACTOR)
 
 br_pairs, wf_pairs = get_bit_rates_and_waveforms(train_truth_ds_pairs[0])
 true_br = br_pairs[0]
@@ -152,12 +167,13 @@ for i in range(NUMBER_OF_EPOCHS*epoch_scale):
                                         feed_dict={train_flag: True,
                                                    x: batch[1],
                                                    y_true: batch[0]})
-            train_writer.add_summary(summary, i)
-            train_loss_file.write('{}, {}\n'.format(epoch_num, loss))
-            save_path = saver.save(sess,
-                                   "aux/model_checkpoints/{}_{}.ckpt".format(
-                                        model_name, epoch_num))
             print("Epoch {}, Loss {}".format(epoch_num, loss))
+            # train_writer.add_summary(summary, i)
+            train_loss_file.write('{}, {}\n'.format(epoch_num, loss))
+            if epoch_num % 3 == 0:
+                save_path = saver.save(sess,
+                                     "aux/model_checkpoints/{}_{}.ckpt".format(
+                                        model_name, epoch_num))
 
     train_step.run(feed_dict={train_flag: True,
                               x: batch[1],

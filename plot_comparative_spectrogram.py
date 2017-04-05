@@ -1,10 +1,15 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
 # from matplotlib.ticker import FormatStrFormatter
 import librosa
 import librosa.display
 
 
+original_sample = 'Real Test/full_train_test_true.wav'
+ds_sample = 'Real Test/full_train_test_ds.wav'
+reco_sample = 'Real Test/full_train_test_reco.wav'
+output_file_name = 'Real Test/real_full_train_test_spec_comp.pdf'
 # original_sample = 'full_train_test_true.wav'
 # ds_sample = 'full_train_test_ds.wav'
 # reco_sample = 'full_train_test_reco.wav'
@@ -13,16 +18,16 @@ import librosa.display
 # ds_sample = 'full_train_validation_ds.wav'
 # reco_sample = 'full_train_validation_reco.wav'
 # output_file_name = 'full_train_validation_spec_comp.pdf'
-original_sample = 'overtrain_true.wav'
-ds_sample = 'overtrain_ds.wav'
-reco_sample = 'overtrain_reco.wav'
-output_file_name = 'overtrain_spec_comp.pdf'
+# original_sample = 'overtrain_true.wav'
+# ds_sample = 'overtrain_ds.wav'
+# reco_sample = 'overtrain_reco.wav'
+# output_file_name = 'overtrain_spec_comp.pdf'
 # original_sample = 'loss_function_comparison/gm_overtrain_true.wav'
 # ds_sample = 'loss_function_comparison/gm_overtrain_ds.wav'
 # reco_sample = 'loss_function_comparison/gm_overtrain_reco.wav'
 # output_file_name = 'loss_function_comparison/gm_overtrain_spec_comp.pdf'
-# n_fft = 512
-n_fft = 256
+n_fft = 4*512
+# n_fft = 256
 
 
 y_true, sr_true = librosa.load(original_sample, sr=None)
@@ -38,7 +43,8 @@ def compute_signal_to_noise(truth, reco):
 def plot_all(true_spectrogram, ds_spectrogram, reco_spectrogram,
              true_waveform, ds_waveform, reco_waveform,
              true_sr, ds_sr, reco_sr, ofile, n_fft):
-    max_frame = 200
+    # max_frame = 200
+    max_frame = 100
     plt.figure(figsize=(8, 6))
 
     if not (true_sr == ds_sr == reco_sr):
@@ -59,41 +65,47 @@ def plot_all(true_spectrogram, ds_spectrogram, reco_spectrogram,
     reco_lsd = np.mean(np.sqrt(np.mean(reco_X_diff_squared, axis=0)))
 
     # spectrogram plots
-    cmap = 'inferno'
-    # cmap = 'magma'
-    # cmap = 'plasma'
-    plt.subplot(3, 2, 1)
+    # cmap = 'nipy_spectral'
+    # cmap = 'rainbow_r'
+    # cmap = 'gist_rainbow'
+    cmap = 'viridis'
+    # cmap = 'inferno_r'
+    # cmap = 'magma_r'
+    # cmap = 'plasma_r'
+    ax = plt.subplot(3, 2, 1)
     plt.title('True Spectrum (dB)')
-    fig = librosa.display.specshow(librosa.amplitude_to_db(true_dB,
-                                                           ref=np.max),
+    fig = librosa.display.specshow(true_dB,
                                    sr=true_sr, y_axis='hz', x_axis='time',
-                                   hop_length=n_fft/4, cmap=cmap)
+                                   hop_length=n_fft/4, cmap=cmap,
+                                   edgecolors='face')
     fig.axes.set_xticklabels([])
     plt.xlabel('')
     plt.ylabel('frequency (Hz)')
 
     ax = plt.subplot(3, 2, 3)
     plt.title('Downsampled Spectrum (dB)')
-    fig = librosa.display.specshow(librosa.amplitude_to_db(ds_dB,
-                                                           ref=np.max),
+    fig = librosa.display.specshow(ds_dB,
                                    sr=ds_sr, y_axis='hz', x_axis='time',
-                                   hop_length=n_fft/4, cmap=cmap)
+                                   hop_length=n_fft/4, cmap=cmap,
+                                   edgecolors='face')
     fig.axes.set_xticklabels([])
     plt.xlabel('')
     plt.ylabel('frequency (Hz)')
     ax.text(0.65, 0.25, r'LSD={:.2}'.format(ds_lsd),
-            color='black', fontsize=13, transform=ax.transAxes)
+            color='blue', fontsize=13, transform=ax.transAxes,
+            backgroundcolor='white')
 
     ax = plt.subplot(3, 2, 5)
     plt.title('Reconstructed Spectrum (dB)')
-    fig = librosa.display.specshow(librosa.amplitude_to_db(reco_dB,
-                                                           ref=np.max),
+    fig = librosa.display.specshow(reco_dB,
                                    sr=reco_sr, y_axis='hz', x_axis='time',
-                                   hop_length=n_fft/4, cmap=cmap)
+                                   hop_length=n_fft/4, cmap=cmap,
+                                   edgecolors='face')
     plt.xlabel('time (s)')
     plt.ylabel('frequency (Hz)')
     ax.text(0.65, 0.25, r'LSD={:.2}'.format(reco_lsd),
-            color='black', fontsize=13, transform=ax.transAxes)
+            color='blue', fontsize=13, transform=ax.transAxes,
+            backgroundcolor='white')
 
     # compute SNR for waveform plots
     ds_snr = compute_signal_to_noise(true_waveform, ds_waveform)
@@ -114,7 +126,8 @@ def plot_all(true_spectrogram, ds_spectrogram, reco_spectrogram,
     fig = plt.plot(ds_time, ds_waveform[:max_frame])
     plt.ylabel('amplitude')
     ax.text(0.05, 0.1, r'SNR={:.1f}'.format(ds_snr),
-            color='blue', fontsize=13, transform=ax.transAxes)
+            color='blue', fontsize=13, transform=ax.transAxes,
+            backgroundcolor='white')
 
     ax = plt.subplot(3, 2, 6)
     reco_time = np.arange(max_frame, dtype=np.float)/float(reco_sr)
@@ -123,7 +136,8 @@ def plot_all(true_spectrogram, ds_spectrogram, reco_spectrogram,
     plt.ylabel('amplitude')
     plt.xlabel('time (s)')
     ax.text(0.05, 0.1, r'SNR={:.1f}'.format(reco_snr),
-            color='blue', fontsize=13, transform=ax.transAxes)
+            color='blue', fontsize=13, transform=ax.transAxes,
+            backgroundcolor='white')
 
     plt.tight_layout()
 
