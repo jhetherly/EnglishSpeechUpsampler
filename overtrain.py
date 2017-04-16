@@ -11,7 +11,7 @@ from models import deep_residual_network
 
 # Constants describing the training process.
 BATCH_SIZE = 64
-NUMBER_OF_EPOCHS = 900              # Number of epochs to train
+NUMBER_OF_EPOCHS = 1800              # Number of epochs to train
 NUM_EPOCHS_PER_DECAY = 50.0      # Epochs after which learning rate decays.
 LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 0.001       # Initial learning rate.

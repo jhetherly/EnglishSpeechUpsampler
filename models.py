@@ -83,7 +83,7 @@ def subpixel_restack(X, n_prime, m_prime=None, name=None):
 
 
 def BatchNorm(T, is_training, scope):
-    # tf.cond takes nullary functions as it's first and second arguments
+    # tf.cond takes nullary functions as its first and second arguments
     return tf.cond(is_training,
                    lambda: tf.contrib.layers.batch_norm(T,
                             decay=0.99,
