@@ -3,6 +3,7 @@ import tensorflow as tf
 custom_shuffle_module = tf.load_op_library('src/shuffle_op.so')
 shuffle = custom_shuffle_module.shuffle
 
+
 # ###################
 # TENSORBOARD HELPERS
 # ###################
@@ -88,20 +89,20 @@ def BatchNorm(T, is_training, scope):
     # tf.cond takes nullary functions as its first and second arguments
     return tf.cond(is_training,
                    lambda: tf.contrib.layers.batch_norm(T,
-                            decay=0.99,
-                            # zero_debias_moving_mean=True,
-                            is_training=is_training,
-                            center=True, scale=True,
-                            updates_collections=None,
-                            scope=scope,
-                            reuse=False),
+                                                decay=0.99,
+                                                # zero_debias_moving_mean=True,
+                                                is_training=is_training,
+                                                center=True, scale=True,
+                                                updates_collections=None,
+                                                scope=scope,
+                                                reuse=False),
                    lambda: tf.contrib.layers.batch_norm(T,
-                            decay=0.99,
-                            is_training=is_training,
-                            center=True, scale=True,
-                            updates_collections=None,
-                            scope=scope,
-                            reuse=True))
+                                                decay=0.99,
+                                                is_training=is_training,
+                                                center=True, scale=True,
+                                                updates_collections=None,
+                                                scope=scope,
+                                                reuse=True))
 
 
 def weight_variable(shape, name=None):
@@ -257,10 +258,6 @@ def build_upsampling_block(input_tensor, residual_tensor,
                                   name=name)
         if tensorboard_output:
             histogram_variable_summaries(l)
-        # print('after residual_tensor: {}'.format(
-        #     residual_tensor.get_shape().as_list()[1:]))
-        # print('after subpixel_reshuffle: {}'.format(
-        #     l.get_shape().as_list()[1:]))
     with tf.name_scope('{}_layer_stacking'.format(layer_number)):
         sliced = tf.slice(residual_tensor,
                           begin=[0, 0, 0],
@@ -268,10 +265,9 @@ def build_upsampling_block(input_tensor, residual_tensor,
         l = tf.concat((l, sliced), axis=2, name=name)
         if tensorboard_output:
             histogram_variable_summaries(l)
-        # print('sliced: {}'.format(sliced.get_shape().as_list()[1:]))
-        # print('after concat: {}'.format(l.get_shape().as_list()[1:]))
 
     return l
+
 # ######################
 # ######################
 
@@ -300,9 +296,6 @@ def single_fully_connected_model(input_type, input_shape,
             s = []
             s.append(shape_prod)
             s.append(n_weights)
-            # W = tf.Variable(initial_value=np.eye(shape_prod,
-            #                                      n_weights).astype(
-            #                                      np.float32))
             W = weight_variable(s)
             if tensorboard_output:
                 histogram_variable_summaries(W)
@@ -354,46 +347,6 @@ def three_layer_conv_model(input_type, input_shape,
                                 tf.identity, 3,
                                 tensorboard_output,
                                 scope_name)
-
-        return x, y
-
-
-def three_layer_conv_with_res_model(input_type, input_shape,
-                                    first_conv_window=30, first_conv_depth=128,
-                                    second_conv_window=10,
-                                    second_conv_depth=64,
-                                    third_conv_window=15,
-                                    tensorboard_output=False,
-                                    scope_name='3-layer_conv_res'):
-
-    with tf.name_scope(scope_name):
-        # input of the model (examples)
-        s = [None]
-        for i in input_shape:
-            s.append(i)
-        x = tf.placeholder(input_type, shape=s)
-
-        # first conv layer
-        h1 = build_1d_conv_layer(x, 1,
-                                 first_conv_window, first_conv_depth,
-                                 tf.nn.elu, 1,
-                                 tensorboard_output)
-
-        # # second conv layer
-        # h2 = build_1d_conv_layer(h1, first_conv_depth,
-        # # h2 = build_1d_conv_layer_with_res(h1, first_conv_depth,
-        #                          second_conv_window, second_conv_depth,
-        #                         #  h1, tf.nn.elu, 2,
-        #                          tf.nn.elu, 2,
-        #                          tensorboard_output)
-
-        # third (last) conv layer
-        # y = build_1d_conv_layer_with_res(h2, second_conv_depth,
-        y = build_1d_conv_layer_with_res(h1, first_conv_depth,
-                                         third_conv_window, 1,
-                                         x, tf.identity, 3,
-                                         tensorboard_output,
-                                         scope_name)
 
         return x, y
 
@@ -465,7 +418,6 @@ def deep_residual_network(input_type, input_shape,
     downsample_layers = []
     upsample_layers = []
 
-    # tf.reset_default_graph()
     with tf.name_scope(scope_name):
         # training flag
         train_flag = tf.placeholder(tf.bool)

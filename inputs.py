@@ -97,6 +97,23 @@ def read_file_pair(filename_pair, mono=True):
         ds_waveform.reshape((-1, channel))
 
 
+def gather_all_files_by_tags(file_dir, tags):
+    """
+    gather all truth/example pairs that match strings given in the tags list
+    """
+    train_truth_ds_pairs = get_selected_truth_ds_filename_pairs(
+        file_dir, tags, 'train')
+    temp_addition = get_selected_truth_ds_filename_pairs(
+        file_dir, tags, 'validation')
+    if len(temp_addition) > 0:
+        train_truth_ds_pairs = train_truth_ds_pairs + temp_addition
+    temp_addition = get_selected_truth_ds_filename_pairs(
+        file_dir, tags, 'test')
+    if len(temp_addition) > 0:
+        train_truth_ds_pairs = train_truth_ds_pairs + temp_addition
+    return train_truth_ds_pairs
+
+
 def randomly_batch(batch_size, filename_pairs, mono=True):
     """
     randomly selects batch_size number of samples from a list of file name
