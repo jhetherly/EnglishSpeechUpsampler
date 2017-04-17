@@ -9,8 +9,17 @@ The training set is a collection of TED talks found
 
 ## Installation Instructions
 
-First, make sure the [required software](##Requirements-and-Dependencies) is
+Make sure the [required software](##Requirements-and-Dependencies) is
 installed.
+To compile the custom C++ library that enables fast
+[subpixel shuffling](https://arxiv.org/pdf/1609.05158.pdf),
+`cd` into the `src` directory and run the
+[COMPILE_FROM_BINARY](src/COMPILE_FROM_BINARY.sh) Bash script.
+This should be all that is required to run the upsampling script.
+
+## Usage
+
+In order to use the 
 
 ## Requirements and Dependencies
 

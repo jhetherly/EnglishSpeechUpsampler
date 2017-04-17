@@ -17,8 +17,8 @@ settings = json.load(open(settings_file))
 # BATCH_SIZE = 64                     # Samples per batch
 BATCH_SIZE = 8                     # Samples per batch
 # NUMBER_OF_EPOCHS = 1800             # Number of epochs to train
-NUMBER_OF_EPOCHS = 300               # Number of epochs to train
-NUM_EPOCHS_PER_DECAY = 50.0         # Epochs after which learning rate decays.
+NUMBER_OF_EPOCHS = 300              # Number of epochs to train
+NUM_EPOCHS_PER_DECAY = 50           # Epochs after which learning rate decays.
 LEARNING_RATE_DECAY_FACTOR = 0.1    # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 0.001       # Initial learning rate.
 
