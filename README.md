@@ -9,7 +9,7 @@ The training set is a collection of TED talks found
 
 ## Installation Instructions
 
-First, make sure the [required software](Requirements-and-Dependencies) is
+First, make sure the [required software](##Requirements-and-Dependencies) is
 installed.
 
 ## Requirements and Dependencies
@@ -21,5 +21,5 @@ tested are given for reference.
 * Tensorflow 1.0.1
 * Numpy 1.12.1
 * Librosa 0.5.0
-* tqdm 4.11.2
+* tqdm 4.11.2 (only for preprocessing training data)
 * Sox 1.2.7 (only for preprocessing training data)
