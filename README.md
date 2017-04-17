@@ -19,7 +19,8 @@ This should be all that is required to run the upsampling script.
 
 ## Usage
 
-In order to use the 
+Since GitHub doesn't allow for files larger than 100 MB, the model must be
+retrained in order to perform the upsampling.
 
 ## Requirements and Dependencies
 

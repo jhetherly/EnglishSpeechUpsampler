@@ -134,17 +134,17 @@ for i in range(NUMBER_OF_EPOCHS*epoch_scale):
         total_val_loss = 0
         val_count = 0
         for pair in next_batch(BATCH_SIZE, val_truth_ds_pairs):
-            loss_val = sess.run([loss],
+            loss_value = sess.run([loss],
                                 feed_dict={train_flag: False,
                                            x: pair[1],
                                            y_true: pair[0]}
                                 )
-            total_val_loss += np.mean(loss_val)
+            total_val_loss += np.mean(loss_value)
             val_count += 1
+        loss_value = total_val_loss/val_count
         val_loss_file.write('{},{}\n'.format(epoch_num,
-                                             total_val_loss/val_count))
-        print("Epoch {}, Val Loss {}".format(epoch_num,
-                                             np.mean(loss_val)))
+                                             loss_value))
+        print("Epoch {}, Val Loss {}".format(epoch_num, loss_value))
     batch = randomly_batch(BATCH_SIZE, train_truth_ds_pairs)
     if write_tb:
         if is_new_epoch:
@@ -165,11 +165,11 @@ for i in range(NUMBER_OF_EPOCHS*epoch_scale):
                               y_true: batch[0]},
                    session=sess)
     if (i + 1) % 500 == 0 and not is_new_epoch:
-        loss = np.mean(sess.run([loss],
+        loss_val = np.mean(sess.run([loss],
                                 feed_dict={train_flag: True,
                                            x: batch[1],
                                            y_true: batch[0]}))
-        print("Iteration {}, Loss {}".format(i + 1, loss))
+        print("Iteration {}, Loss {}".format(i + 1, loss_val))
 
 val_loss_file.close()
 train_loss_file.close()
