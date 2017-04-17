@@ -85,7 +85,7 @@ def subpixel_restack(X, n_prime, m_prime=None, name=None):
     return subpixel_restack_impl(X, n_prime, m_prime, name=name)
 
 
-def BatchNorm(T, is_training, scope):
+def batch_norm(T, is_training, scope):
     # tf.cond takes nullary functions as its first and second arguments
     return tf.cond(is_training,
                    lambda: tf.contrib.layers.batch_norm(T,
@@ -205,7 +205,7 @@ def build_downsampling_block(input_tensor,
             histogram_variable_summaries(l)
     with tf.name_scope('{}_layer_batch_norm'.format(layer_number)) as scope:
         # l = tf.nn.dropout(l, keep_prob=0.25)
-        l = BatchNorm(l, is_training, scope)
+        l = batch_norm(l, is_training, scope)
     with tf.name_scope('{}_layer_conv_activation'.format(layer_number)):
         l = act(l, name=name)
         if tensorboard_output:
@@ -246,7 +246,7 @@ def build_upsampling_block(input_tensor, residual_tensor,
             histogram_variable_summaries(l)
     with tf.name_scope('{}_layer_batch_norm'.format(layer_number)) as scope:
         # l = tf.nn.dropout(l, keep_prob=0.25)
-        l = BatchNorm(l, is_training, scope)
+        l = batch_norm(l, is_training, scope)
         # l = tf.nn.l2_normalize(l, dim=2)
     with tf.name_scope('{}_layer_conv_activation'.format(layer_number)):
         l = act(l, name=name)

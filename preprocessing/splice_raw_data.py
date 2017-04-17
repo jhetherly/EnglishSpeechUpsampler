@@ -1,18 +1,23 @@
 import os
+import json
+import tqdm
 import sox
 
-input_dir_name_base = '/home/paperspace/Documents' +\
-                      '/TEDLIUM/TEDLIUM_release2/{}/sph'
-input_dir_name_dirs = ['dev', 'test', 'train']
-duration_chunks = 0.5  # in seconds
-start_time = 30  # in seconds
-end_time = -30  # in seconds
-downsample_rate = 4000  # in kbps
-output_dir_name_base = '/home/paperspace/Documents' +\
-                       '/TEDLIUM/TEDLIUM_release2/preprocessed'
+splice_settings_file = 'data_settings.json'
+
+settings = json.load(open(splice_settings_file))
+input_dir_name_base = settings['input_dir_name_base']
+input_dir_name_dirs = settings['input_dir_name_dirs']
+splice_duration = settings['splice_duration']
+start_time = settings['start_time']
+end_time = settings['end_time']
+downsample_rate = settings['downsample_rate']
+output_dir_name_base = settings['output_dir_name_base']
 
 output_dir_name = os.path.join(output_dir_name_base, 'splices')
 ds_output_dir_name = os.path.join(output_dir_name_base, 'downsampled_splices')
+output_data_info_file_name = os.path.join(output_dir_name_base,
+                                          'data_info.json')
 
 if not os.path.exists(output_dir_name):
     os.makedirs(output_dir_name)
@@ -22,6 +27,10 @@ if not os.path.exists(ds_output_dir_name):
 print('Will send spliced audio to {}'.format(output_dir_name))
 print('Will send spliced and downsampled audio to' +
       ' {}'.format(ds_output_dir_name))
+print('Will write data info to {}'.format(output_data_info_file_name))
+
+processed_data_info = settings
+processed_data_info['original_bitrate'] = None
 
 for input_dir_name_dir in input_dir_name_dirs:
     input_dir_name = input_dir_name_base.format(input_dir_name_dir)
@@ -37,20 +46,30 @@ for input_dir_name_dir in input_dir_name_dirs:
         # start and end times
         duration = sox.file_info.duration(input_filename) - (start_time -
                                                              end_time)
+        if processed_data_info['original_bitrate'] is None:
+            processed_data_info['original_bitrate'] =\
+                sox.file_info.bitrate(input_filename)
+            if 'kb' in processed_data_info['sampling_rate_units']:
+                processed_data_info['original_bitrate'] *= 1000
 
-        n_iterations = int(duration/duration_chunks)
+        n_iterations = int(duration/splice_duration)
+        num_of_digits = len(str(int(duration)))
+        num_format = '{{:0{}d}}'.format(num_of_digits)
+        file_name_template = '{{}}_{}-{}.wav'.format(num_format, num_format)
 
-        for i in range(n_iterations):
+        print('On file {}'.format(filename_base))
+        for i in tqdm.trange(n_iterations):
             # create trasnformer
             splice = sox.Transformer()
             splice_and_downsample = sox.Transformer()
 
-            begin = start_time + i*duration_chunks
-            end = begin + duration_chunks
-            output_filename = '{}_{}-{}.wav'.format(filename_base, begin, end)
+            begin = int(start_time + i*splice_duration)
+            end = int(begin + splice_duration)
+            output_filename = file_name_template.format(filename_base,
+                                                        begin, end)
             output_filename = os.path.join(output_dir_name, output_filename)
-            ds_output_filename = '{}_{}-{}.wav'.format(filename_base,
-                                                       begin, end)
+            ds_output_filename = file_name_template.format(filename_base,
+                                                           begin, end)
             ds_output_filename = os.path.join(ds_output_dir_name,
                                               ds_output_filename)
 
@@ -61,5 +80,5 @@ for input_dir_name_dir in input_dir_name_dirs:
             splice.build(input_filename, output_filename)
             splice_and_downsample.build(input_filename, ds_output_filename)
 
-            print('Finished split {} of {} for {}'.format(i + 1, n_iterations,
-                                                          filename_base))
+with open(output_data_info_file_name, 'w') as outfile:
+    json.dump(processed_data_info, outfile)

@@ -1,12 +1,15 @@
 import os
 import csv
+import json
 import numpy as np
 
-validation_fraction = 0.2
-test_fraction = 0.2
-file_dir_base = '/home/paperspace/Documents/TEDLIUM/TEDLIUM_release2' +\
-                '/preprocessed/'
-output_dir = '/home/paperspace/Documents/EnglishSpeechUpsampler/aux'
+settings_file = 'data_settings.json'
+
+settings = json.load(open(settings_file))
+validation_fraction = settings['validation_fraction']
+test_fraction = settings['test_fraction']
+file_dir_base = settings['output_dir_name_base']
+output_dir = settings['output_dir_name_base']
 
 np.random.seed(0)
 

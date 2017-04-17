@@ -4,7 +4,7 @@ import numpy as np
 import librosa
 
 """
-The inputs are assumed to already be preprocessed and spliced into 10 second
+The inputs are assumed to already be preprocessed and spliced into
 clips and split into a training, testing, and validation set.
 These sets are stored as csv files which are later read in in batches with
 functions in this module.

@@ -1,4 +1,5 @@
 import numpy as np
+import json
 import librosa
 from inputs import get_bit_rates_and_waveforms
 from inputs import randomly_batch, next_batch
@@ -6,24 +7,30 @@ from inputs import read_file_pair, gather_all_files_by_tags
 import tensorflow as tf
 from models import deep_residual_network
 from losses import mse
+from optimizers import make_variable_learning_rate, setup_optimizer
 
+settings_file = 'preprocessing/data_settings.json'
+
+settings = json.load(open(settings_file))
 
 # Constants describing the training process.
-BATCH_SIZE = 64
-NUMBER_OF_EPOCHS = 1800             # Number of epochs to train
+# BATCH_SIZE = 64                     # Samples per batch
+BATCH_SIZE = 8                     # Samples per batch
+# NUMBER_OF_EPOCHS = 1800             # Number of epochs to train
+NUMBER_OF_EPOCHS = 300               # Number of epochs to train
 NUM_EPOCHS_PER_DECAY = 50.0         # Epochs after which learning rate decays.
 LEARNING_RATE_DECAY_FACTOR = 0.1    # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 0.001       # Initial learning rate.
 
 example_number = 0
 write_tb = False
-file_name_lists_dir = '/home/paperspace/Documents/EnglishSpeechUpsampler/aux'
+file_name_lists_dir = settings['output_dir_name_base']
 # selected_files = ['BillGates_2010']
 selected_files = ['RobertGupta_2010U']
 
 
 # ###########
-# Data import
+# DATA IMPORT
 # ###########
 
 train_truth_ds_pairs = gather_all_files_by_tags(file_name_lists_dir,
@@ -72,41 +79,24 @@ loss = mse('waveform_loss', y_true, model)
 # OPTIMIZATION ROUTINE
 # ####################
 
-# Variables that affect learning rate.
-num_batches_per_epoch = 1
+# Variable that affect learning rate.
+num_batches_per_epoch = float(SAMPLES_PER_EPOCH)/BATCH_SIZE
 decay_steps = int(num_batches_per_epoch * NUM_EPOCHS_PER_DECAY)
 
-# Decay the learning rate exponentially based on the number of steps.
-global_step = tf.Variable(0, trainable=False)
-with tf.name_scope('learning_rate'):
-    # lr = tf.train.exponential_decay(INITIAL_LEARNING_RATE,
-    #                                 global_step,
-    #                                 decay_steps,
-    #                                 LEARNING_RATE_DECAY_FACTOR,
-    #                                 staircase=True)
-    lr = tf.train.inverse_time_decay(INITIAL_LEARNING_RATE,
-                                     global_step,
-                                     decay_steps,
-                                     LEARNING_RATE_DECAY_FACTOR,
-                                     staircase=False)
-tf.summary.scalar('learning_rate', lr)
+# Decay the learning rate based on the number of steps.
+lr, global_step = make_variable_learning_rate(INITIAL_LEARNING_RATE,
+                                              decay_steps,
+                                              LEARNING_RATE_DECAY_FACTOR,
+                                              False)
 
-update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-with tf.control_dependencies(update_ops):
-    # Ensures that we execute the update_ops before performing the train_step
-    # (for batch normalization)
-    with tf.name_scope('train'):
-        # train_step = tf.train.RMSPropOptimizer(lr).minimize(loss,
-        #                                                     global_step=global_step
-        #                                                     )
-        # train_step = tf.train.GradientDescentOptimizer(1e-2).minimize(loss)
-        # train_step = tf.train.AdamOptimizer(1e-4,
-        #                                     epsilon=1e-01).minimize(loss)
-        train_step = tf.train.AdamOptimizer(1e-4,
-                                        epsilon=1e-08).minimize(loss)
-        # train_step = tf.train.AdamOptimizer(lr,
-        #         epsilon=1e-08).minimize(loss, global_step=global_step)
-        # train_step = tf.train.AdagradOptimizer(1e-3).minimize(loss)
+# lr = 1e-4
+# min_args = {}
+min_args = {'global_step': global_step}
+# tf.train.RMSPropOptimizer, tf.train.GradientDescentOptimizer,
+# tf.train.AdamOptimizer, tf.train.AdagradOptimizer
+train_step = setup_optimizer(lr, loss, tf.train.AdamOptimizer,
+                             using_batch_norm=True,
+                             min_args=min_args)
 
 # ####################
 # ####################
@@ -131,6 +121,7 @@ sess.run(tf.global_variables_initializer())
 # TRAINING LOOP
 # #############
 
+# Calulate loss on training sample
 example_loss = 0.0
 example_loss_count = 0
 for truth, example in next_batch(1, train_truth_ds_pairs):
@@ -139,6 +130,8 @@ for truth, example in next_batch(1, train_truth_ds_pairs):
 example_loss = example_loss/float(example_loss_count)
 
 print('loss score of example {}'.format(example_loss))
+
+# training loop
 train_loss_file = open('overtrain_loss.txt', 'w')
 for i in range(NUMBER_OF_EPOCHS):
     for pair in next_batch(BATCH_SIZE, train_truth_ds_pairs):
