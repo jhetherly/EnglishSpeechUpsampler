@@ -10,16 +10,22 @@ from losses import mse
 from optimizers import make_variable_learning_rate, setup_optimizer
 
 settings_file = 'preprocessing/data_settings.json'
+training_settings_file = 'training_settings.json'
 
 settings = json.load(open(settings_file))
+training_settings = json.load(open(training_settings_file))
 
 # Constants describing the training process.
-# BATCH_SIZE = 64                     # Samples per batch
-BATCH_SIZE = 8                      # Samples per batch
-NUMBER_OF_EPOCHS = 10               # Number of epochs to train
-NUM_EPOCHS_PER_DECAY = 2            # Epochs after which learning rate decays.
-LEARNING_RATE_DECAY_FACTOR = 0.1    # Learning rate decay factor.
-INITIAL_LEARNING_RATE = 0.001       # Initial learning rate.
+# Samples per batch.
+BATCH_SIZE = training_settings['batch_size']
+# Number of epochs to train.
+NUMBER_OF_EPOCHS = training_settings['number_of_epochs']
+# Epochs after which learning rate decays.
+NUM_EPOCHS_PER_DECAY = training_settings['num_epochs_per_decay']
+# Learning rate decay factor.
+LEARNING_RATE_DECAY_FACTOR = training_settings['learning_rate_decay_factor']
+# Initial learning rate.
+INITIAL_LEARNING_RATE = training_settings['initial_learning_rate']
 
 example_number = 0
 write_tb = False
@@ -54,7 +60,17 @@ print('Batch size: {}'.format(BATCH_SIZE))
 # MODEL DEFINITION
 # ################
 
-train_flag, x, model = deep_residual_network(true_wf.dtype, true_wf.shape)
+train_flag, x, model = deep_residual_network(true_wf.dtype, true_wf.shape,
+    number_of_downsample_layers=training_settings[
+        'model_number_of_sampling_layers'],
+    channel_multiple=training_settings['model_channel_multiple'],
+    initial_filter_window=training_settings['model_initial_filter_window'],
+    downsample_filter_window=training_settings[
+        'model_downsample_filter_window'],
+    bottleneck_filter_window=training_settings[
+        'model_bottleneck_filter_window'],
+    upsample_filter_window=training_settings[
+        'model_upsample_filter_window'])
 
 # placeholder for the true waveform
 y_true = tf.placeholder(true_wf.dtype,
