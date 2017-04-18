@@ -9,11 +9,13 @@ from models import deep_residual_network
 from losses import mse
 from optimizers import make_variable_learning_rate, setup_optimizer
 
-settings_file = 'preprocessing/data_settings.json'
-training_settings_file = 'training_settings.json'
+settings_file = 'settings/data_settings.json'
+training_settings_file = 'settings/training_settings.json'
+model_settings_file = 'settings/model_settings.json'
 
 settings = json.load(open(settings_file))
 training_settings = json.load(open(training_settings_file))
+model_settings = json.load(open(model_settings_file))
 
 # Constants describing the training process.
 # Samples per batch.
@@ -60,17 +62,9 @@ print('Batch size: {}'.format(BATCH_SIZE))
 # MODEL DEFINITION
 # ################
 
-train_flag, x, model = deep_residual_network(true_wf.dtype, true_wf.shape,
-    number_of_downsample_layers=training_settings[
-        'model_number_of_sampling_layers'],
-    channel_multiple=training_settings['model_channel_multiple'],
-    initial_filter_window=training_settings['model_initial_filter_window'],
-    downsample_filter_window=training_settings[
-        'model_downsample_filter_window'],
-    bottleneck_filter_window=training_settings[
-        'model_bottleneck_filter_window'],
-    upsample_filter_window=training_settings[
-        'model_upsample_filter_window'])
+train_flag, x, model = deep_residual_network(true_wf.dtype,
+                                             true_wf.shape,
+                                             **model_settings)
 
 # placeholder for the true waveform
 y_true = tf.placeholder(true_wf.dtype,

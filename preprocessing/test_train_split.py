@@ -3,7 +3,7 @@ import csv
 import json
 import numpy as np
 
-settings_file = 'data_settings.json'
+settings_file = '../settings/data_settings.json'
 
 settings = json.load(open(settings_file))
 validation_fraction = settings['validation_fraction']

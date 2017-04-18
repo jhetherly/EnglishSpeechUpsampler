@@ -1,0 +1,8 @@
+{
+  "number_of_downsample_layers": 8,
+  "channel_multiple": 8,
+  "initial_filter_window": 5,
+  "downsample_filter_window": 3,
+  "bottleneck_filter_window": 4,
+  "upsample_filter_window": 3
+}

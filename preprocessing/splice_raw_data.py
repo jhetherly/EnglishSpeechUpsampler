@@ -3,7 +3,7 @@ import json
 import tqdm
 import sox
 
-splice_settings_file = 'data_settings.json'
+splice_settings_file = '../settings/data_settings.json'
 
 settings = json.load(open(splice_settings_file))
 input_dir_name_base = settings['input_dir_name_base']

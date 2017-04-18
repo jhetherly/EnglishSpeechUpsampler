@@ -23,8 +23,9 @@ Since GitHub doesn't allow for files larger than 100 MB, the model must be
 retrained in order to perform the upsampling.
 The steps to retraining the model are:
 
-1. Download and unzip the [TEDLIUM](http://www-lium.univ-lemans.fr/en/content/ted-lium-corpus) datase.
-2. Configure the [data_settings](preprocessing/data_settings.json) JSON file to
+1. Download and unzip the
+[TEDLIUM](http://www-lium.univ-lemans.fr/en/content/ted-lium-corpus) datase.
+2. Configure the [data_settings](settings/data_settings.json) JSON file to
 point to the location of the dataset (`input_dir_name_base`) as well as
 specifying the location to store the output (`output_dir_name_base`).
 3. This JSON file also contains the duration of the spliced samples which are
@@ -38,7 +39,15 @@ create the CSV files that store which samples are used for training, validation,
 and testing.
 6. Now that the data is properly preprocessed, the training script
 ([train.py](train.py)) can be run. The settings for the training script are
-found in the JSON file.
+found in the [training_settings](settings/training_settings.json) JSON file.
+Several
+aspects of training including the learning rate schedule and batch size. Model
+parameters are found in the [model_settings](settings/model_settings.json) JSON
+file.
+7. After running the training (which likely take several days), the
+[upsample_audio_file](upsample_audio_file.py) script can be used to upsample
+a WAV formatted audio file from 4 kbps to 16 kbps. The settings for this script
+are found in the [upsampling_settings](settings/upsampling_settings.json) JSON file.
 
 ## Requirements and Dependencies
 
