@@ -1,18 +1,37 @@
 import os
+import json
 import numpy as np
 import librosa
-# import sox
+from inputs import get_bit_rates_and_waveforms
+from inputs import get_truth_ds_filename_pairs
 import tensorflow as tf
 from models import deep_residual_network
 
-KBPS = 16000
-SECONDS_PER_INPUT = 2  # must match restored model
-# SECONDS_PER_INPUT = 2
+data_settings_file = 'settings/data_settings.json'
+model_settings_file = 'settings/model_settings.json'
+upsampling_settings_file = 'settings/upsampling_settings.json'
+
+data_settings = json.load(open(data_settings_file))
+model_settings = json.load(open(model_settings_file))
+upsampling_settings = json.load(open(upsampling_settings_file))
+
+file_name_lists_dir = data_settings['output_dir_name_base']
+
+train_truth_ds_pairs = get_truth_ds_filename_pairs(file_name_lists_dir,
+                                                   'train')
+
+br_pairs, wf_pairs = get_bit_rates_and_waveforms(train_truth_ds_pairs[0])
+true_br = br_pairs[0]
+true_wf = wf_pairs[0]
+# reshape for mono waveforms
+true_wf = true_wf.reshape((-1, 1))
+
+KBPS = true_br
+SECONDS_PER_INPUT = data_settings_file['splice_duration']
 INPUT_SIZE = KBPS*SECONDS_PER_INPUT
-OUTPUT_LENGTH = 20*KBPS  # in bits
-DOWNSAMPLE_FACTOR = 4  # in kbps
-BEGIN_OFFSET = 30  # in seconds
-END_OFFSET = -30  # in seconds
+DOWNSAMPLE_FACTOR = KBPS//data_settings_file['downsample_rate']
+BEGIN_OFFSET = data_settings_file['start_time']  # in seconds
+END_OFFSET = data_settings_file['end_time']  # in seconds
 
 # TODO find a way to convert to wav format internally
 source_dir = '/home/paperspace/Documents/'
@@ -45,8 +64,9 @@ number_of_reco_iterations = int(ds_wf.size/INPUT_SIZE)
 # MODEL DEFINITION
 # ################
 
-train_flag, x, model = deep_residual_network(ds_wf.dtype, (INPUT_SIZE, 1),
-                                             tensorboard_output=False)
+train_flag, x, model = deep_residual_network(true_wf.dtype,
+                                             true_wf.shape,
+                                             **model_settings)
 
 # ################
 # ################
@@ -76,11 +96,11 @@ for i in range(number_of_reco_iterations):
                    session=sess).flatten()
 
 librosa.output.write_wav(os.path.join(source_dir, 'true_' + file_name_base),
-                         y=true_wf.flatten()[:OUTPUT_LENGTH], sr=true_br)
+                         y=true_wf.flatten(), sr=true_br)
 librosa.output.write_wav(os.path.join(source_dir, 'ds_' + file_name_base),
-                         y=ds_wf.flatten()[:OUTPUT_LENGTH], sr=true_br)
+                         y=ds_wf.flatten(), sr=true_br)
 librosa.output.write_wav(os.path.join(source_dir, 'reco_' + file_name_base),
-                         y=reco_wf.flatten()[:OUTPUT_LENGTH], sr=true_br)
+                         y=reco_wf.flatten(), sr=true_br)
 
 # ###################
 # ###################

@@ -9,11 +9,11 @@ from models import deep_residual_network
 from losses import mse
 from optimizers import make_variable_learning_rate, setup_optimizer
 
-settings_file = 'settings/data_settings.json'
+data_settings_file = 'settings/data_settings.json'
 training_settings_file = 'settings/training_settings.json'
 model_settings_file = 'settings/model_settings.json'
 
-settings = json.load(open(settings_file))
+data_settings = json.load(open(data_settings_file))
 training_settings = json.load(open(training_settings_file))
 model_settings = json.load(open(model_settings_file))
 
@@ -31,7 +31,7 @@ INITIAL_LEARNING_RATE = training_settings['initial_learning_rate']
 
 example_number = 0
 write_tb = False
-file_name_lists_dir = settings['output_dir_name_base']
+file_name_lists_dir = data_settings['output_dir_name_base']
 
 
 # ###########
