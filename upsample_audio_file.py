@@ -30,21 +30,15 @@ KBPS = true_br
 SECONDS_PER_INPUT = data_settings_file['splice_duration']
 INPUT_SIZE = KBPS*SECONDS_PER_INPUT
 DOWNSAMPLE_FACTOR = KBPS//data_settings_file['downsample_rate']
-BEGIN_OFFSET = data_settings_file['start_time']  # in seconds
-END_OFFSET = data_settings_file['end_time']  # in seconds
+BEGIN_OFFSET = data_settings_file['start_time']
+END_OFFSET = data_settings_file['end_time']
 
-# TODO find a way to convert to wav format internally
-source_dir = '/home/paperspace/Documents/'
-file_name_base = 'GeorgeAyittey_2007G.wav'
-file_name = os.path.join(source_dir, file_name_base)
-# file_name = '/home/paperspace/Documents/TEDLIUM/TEDLIUM_release2/' +\
-#             'train/sph/GeorgeAyittey_2007G.sph'
+file_name = upsampling_settings['input_file']
+source_dir = os.path.split(file_name)[0]
+file_name_base = os.path.split(file_name)[1]
 
-file_name_lists_dir = '/home/paperspace/Documents/EnglishSpeechUpsampler/aux'
-model_checkpoint_file_name = os.path.join(file_name_lists_dir,
-                                          'model_checkpoints/' +
-                                          'overtrain_final.ckpt')
-                                # 'deep_residual_deep_residual_0_final.ckpt')
+
+model_checkpoint_file_name = upsampling_settings['model_checkpoint_file']
 
 
 true_wf, true_br = librosa.load(file_name, sr=None, mono=True)
@@ -53,8 +47,12 @@ ds_wf, ds_br = librosa.load(file_name, sr=int(true_br/DOWNSAMPLE_FACTOR),
 ds_wf = librosa.core.resample(ds_wf, ds_br, true_br)
 
 # trim waveforms
-true_wf = true_wf[BEGIN_OFFSET*true_br:END_OFFSET*true_br]
-ds_wf = ds_wf[BEGIN_OFFSET*true_br:END_OFFSET*true_br]
+if END_OFFSET == 0:
+    true_wf = true_wf[BEGIN_OFFSET*true_br:]
+    ds_wf = ds_wf[BEGIN_OFFSET*true_br:]
+else:
+    true_wf = true_wf[BEGIN_OFFSET*true_br:END_OFFSET*true_br]
+    ds_wf = ds_wf[BEGIN_OFFSET*true_br:END_OFFSET*true_br]
 true_wf = true_wf[:int(true_wf.size/INPUT_SIZE)*INPUT_SIZE]
 ds_wf = ds_wf[:int(ds_wf.size/INPUT_SIZE)*INPUT_SIZE]
 number_of_reco_iterations = int(ds_wf.size/INPUT_SIZE)

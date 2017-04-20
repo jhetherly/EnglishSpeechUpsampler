@@ -1,5 +1,6 @@
 {
   "input_file": "/home/paperspace/Documents/GeorgeAyittey_2007G.wav",
+  "model_checkpoint_file": "/home/paperspace/Documents/EnglishSpeechUpsampler/aux/model_checkpoints/deep_residual_deep_residual_0_final.ckpt",
   "time_units": "seconds",
   "start_time": 30,
   "end_time": -30
