@@ -24,7 +24,7 @@ the missing frequencies in the downsampled waveform using a similarity metric
 However, there is recent interest in using deep neural networks to accomplish
 this upsampling.
 
-## Dataset \& Preprocessing
+## Dataset \& Workflow
 
 There are a variety of domains where audio upsampling is useful.
 Since I focused on a potential voice-over-IP application, the dataset I chose
@@ -38,11 +38,35 @@ These qualities about the TED talks are an approximation to what one may expect
 during a voice-over-IP conversation.
 
 ![Preprocessing Workflow](images/Preprocessing_flow.png)
-The steps I use during preprocessing are outlined in the above figure.
-I start by trimming the first and last 30 seconds from each file to remove the
+
+The preprocessing steps are outlined in the above figure.
+The first and last 30 seconds from each file are trimmed to remove the
 TED logo.
-I then split the files into 2 second clips and create a separate, 4x
-downsampled set of clips at 4 kbps along with a set at the original 16 kbps.
+The files are then split into 2 second clips and a separate, 4x
+downsampled set of clips at 4 kbps are created along with a set at the original
+16 kbps.
+60% of the dataset are used during training while 20% are reserved for
+validation and 20% for testing.
+
+![Training Workflow](images/Training_flow.png)
+
+The training workflow outlined in the above figure uses the downsampled clips of
+the data preprocessing steps and batch-feeds them into the model (a deep neural
+network) to update its weights.
+The model with the lowest validation score (denoted "Best Model") is saved for
+later use.
+
+![Application Workflow](images/Application_flow.png)
+
+The process of using the "Best Model" to upsample an audio file is given in the
+above figure.
+This workflow takes whole audio files, splices them into clips similarly to the
+preprocessing steps, sequentially feeds them to trained model, stitches the
+high-resolution clips back together, and saves the high-resolution file to disk.
+
+## Model Architecture
+
+![Model](images/Audio_UNet_Diagram.png)
 
 ## Installation Instructions
 
