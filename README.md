@@ -114,7 +114,7 @@ clear-sounding.
 Make sure the [required software](##requirements-and-dependencies) is
 installed.
 To compile the custom C++ library that enables fast
-[subpixel shuffling](https://arxiv.org/pdf/1609.05158.pdf),
+[subpixel convolutions](https://arxiv.org/pdf/1609.05158.pdf),
 `cd` into the `src` directory and run the
 [COMPILE_FROM_BINARY](src/COMPILE_FROM_BINARY.sh) Bash script.
 This should be all that is required to run the upsampling script.
@@ -131,13 +131,13 @@ upsampling are configured using JSON files located in [settings](settings)
 folder.
 This isolates much of the logic from the model hyper-parameters and
 system-specific details.
-Here is a list of the different configuration scripts and their settings:
+Here is a list of the different configuration scripts
 
-* [data_settings.json](settings/data_settings.json):
-* [model_settings.json](settings/model_settings.json):
-* [overtraining_settings.json](settings/overtraining_settings.json):
-* [training_settings.json](settings/training_settings.json):
-* [upsampling_setting.json](settings/upsampling_setting.json):
+* [data_settings.json](settings/data_settings.json)
+* [model_settings.json](settings/model_settings.json)
+* [overtraining_settings.json](settings/overtraining_settings.json)
+* [training_settings.json](settings/training_settings.json)
+* [upsampling_setting.json](settings/upsampling_setting.json)
 
 ### Training Steps
 
