@@ -1,11 +1,37 @@
 # EnglishSpeechUpsampler
 
-Upsample speech audio in wav format using a deep neural network based on the
+This repository contains the nessecary Python scripts to train and run a deep
+neural network to perform upsampling on an audio waveform.
+This upsampling (also known as super-resolution) learns to infer missing high
+frequencies in a downsampled audio waveform and is based on the work presented
+in [this paper](https://openreview.net/pdf?id=S1gNakBFx).
+<!-- Upsample speech audio in wav format using a deep neural network based on the
 U-Net architecture found in this
-[paper](https://openreview.net/pdf?id=S1gNakBFx).
 This model is trianed to upsample 4 kbps audio up to 16 kbps.
 The training set is a collection of TED talks found
+[here](http://www-lium.univ-lemans.fr/en/content/ted-lium-corpus). -->
+
+## Overview
+
+Audio super-resolution aims to reconstruct a high-resolution audio waveform
+given a lower-resolution waveform as input.
+There are several potential applications for this type of upsampling in such
+areas as streaming audio and audio restoration.
+A non-deep learning solution is to use a database of audio clips to fill in
+the missing frequencies in the downsampled waveform using a similarity metric
+(see [this](http://ieeexplore.ieee.org/abstract/document/7251945) and
+[this](http://ieeexplore.ieee.org/document/7336890) paper).
+However, there is recent interest in using deep neural networks to accomplish
+this upsampling.
+
+## Dataset
+
+There are a variety of domains where audio upsampling is useful.
+Since I focused on a potential voice-over-IP application, the dataset I chose
+for this repository is a collection of TED talks found
 [here](http://www-lium.univ-lemans.fr/en/content/ted-lium-corpus).
+This dataset contains primarily English speech in front an audience from a
+variety of speakers.
 
 ## Installation Instructions
 
@@ -51,8 +77,8 @@ are found in the [upsampling_settings](settings/upsampling_settings.json) JSON f
 
 ## Requirements and Dependencies
 
-The following packages are required and the version numbers that have been
-tested are given for reference.
+The following packages are required (the version numbers that have been tested
+are given for reference):
 
 * Python 2.7 or 3.6
 * Tensorflow 1.0.1

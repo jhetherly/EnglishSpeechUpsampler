@@ -5,6 +5,7 @@
     "test",
     "train"
   ],
+  "input_data_suffix": ".sph",
   "test_fraction": 0.2,
   "validation_fraction": 0.2,
   "time_units": "seconds",

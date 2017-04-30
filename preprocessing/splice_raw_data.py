@@ -6,6 +6,7 @@ import sox
 splice_settings_file = '../settings/data_settings.json'
 
 settings = json.load(open(splice_settings_file))
+input_data_suffix = settings['input_data_suffix']
 input_dir_name_base = settings['input_dir_name_base']
 input_dir_name_dirs = settings['input_dir_name_dirs']
 splice_duration = settings['splice_duration']
@@ -38,7 +39,8 @@ for input_dir_name_dir in input_dir_name_dirs:
     # Loop over all files within the input directory
     for filename in os.listdir(input_dir_name):
         input_filename = os.path.join(input_dir_name, filename)
-        if not os.path.isfile(input_filename) or '.sph' not in filename:
+        if not os.path.isfile(input_filename) or \
+                input_data_suffix not in filename:
             continue
         filename_base = os.path.splitext(filename)[0]
 
