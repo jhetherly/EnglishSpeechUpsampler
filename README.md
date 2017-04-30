@@ -5,11 +5,6 @@ neural network to perform upsampling on an audio waveform.
 This upsampling (also known as super-resolution) learns to infer missing high
 frequencies in a downsampled audio waveform and is based on the work presented
 in [this paper](https://openreview.net/pdf?id=S1gNakBFx).
-<!-- Upsample speech audio in wav format using a deep neural network based on the
-U-Net architecture found in this
-This model is trianed to upsample 4 kbps audio up to 16 kbps.
-The training set is a collection of TED talks found
-[here](http://www-lium.univ-lemans.fr/en/content/ted-lium-corpus). -->
 
 ## Overview
 
@@ -17,7 +12,7 @@ Audio super-resolution aims to reconstruct a high-resolution audio waveform
 given a lower-resolution waveform as input.
 There are several potential applications for this type of upsampling in such
 areas as streaming audio and audio restoration.
-A non-deep learning solution is to use a database of audio clips to fill in
+A non-deep-learning solution is to use a database of audio clips to fill in
 the missing frequencies in the downsampled waveform using a similarity metric
 (see [this](http://ieeexplore.ieee.org/abstract/document/7251945) and
 [this](http://ieeexplore.ieee.org/document/7336890) paper).
@@ -34,8 +29,8 @@ Each talk is located in separate files with bit rates of 16 kbps which is
 considered high quality for speech audio.
 This dataset contains primarily well-articulated English speech in front an
 audience from a variety of speakers.
-These qualities about the TED talks are an approximation to what one may expect
-during a voice-over-IP conversation.
+These qualities regarding the TED talks are an approximation to what one may
+expect during a voice-over-IP conversation.
 
 ![Preprocessing Workflow](images/Preprocessing_flow.png)
 
@@ -68,6 +63,52 @@ high-resolution clips back together, and saves the high-resolution file to disk.
 
 ![Model](images/Audio_UNet_Diagram.png)
 
+The model architecture is a [U-Net](https://arxiv.org/abs/1505.04597) that uses
+a one-dimensional analogue of
+[subpixel convolutions](https://arxiv.org/abs/1609.05158) instead of
+deconvolution layers.
+The downsampled waveform is sent through eight downsampling blocks that are each
+made of convolutional layers with a stride of two.
+At each layer the number of filter banks is doubled so that while the dimension
+along the waveform is reduced by half, the filter bank dimension is increased by
+two.
+The bottleneck layer is constructed identically to a downsampling block which
+connects to eight upsampling blocks which have residual connections to the
+downsampling blocks.
+These residual connections allow for the sharing of features leanred from the
+low-resolution waveform.
+The upsampling blocks use a subpixel convolution that reorders information along
+one dimension to expand the other dimensions.
+A final convolutional layer with restacking and reordering operations is
+residually added to the original input to yield the upsampled waveform.
+The loss function used is the mean-squared error between the output waveform and
+the original, high-resolution waveform.
+
+## Performance
+
+![Performance](images/real_full_train_test_spec_comp.pdf)
+
+The above figure shows two quantitative measures of performance on a test sample
+after 10 epochs of training.
+On the left column are spectrograms of frequency versus time, and on the right
+are plots of the waveform amplitude versus time.
+The first row contains the spectrogram and waveform plots for the original,
+high-resolution audio sample.
+The middle row contains similar plots for the 4x downsampled version of the
+original audio sample.
+Notice that 3/4 of the highest frequencies are missing in the downsampled
+frequency plot.
+The last row contains the spectromgrams and waveform plots for the output of the
+trained model.
+Inset are two quantitative measures of performance: the signal-to-noise ratio
+(SNR) and the log-spectral distance (LSD).
+Higher SNR values represent clearer-sounding audio while lower LSD values
+indicate matching frequency content.
+The LSD value shows the neural network is attempting to restore the higher
+frequencies wherever appropriate.
+However, the slightly lower SNR value implies that the audio may not be as
+clear-sounding.
+
 ## Installation Instructions
 
 Make sure the [required software](##requirements-and-dependencies) is
@@ -82,7 +123,25 @@ This should be all that is required to run the upsampling script.
 
 Since GitHub doesn't allow for files larger than 100 MB, the model must be
 retrained in order to perform the upsampling.
-The steps to retraining the model are:
+
+### Customization
+
+The Python scripts used to preprocess the data, train the model, and run the
+upsampling are configured using JSON files located in [settings](settings)
+folder.
+This isolates much of the logic from the model hyper-parameters and
+system-specific details.
+Here is a list of the different configuration scripts and their settings:
+
+* [data_settings.json](settings/data_settings.json):
+* [model_settings.json](settings/model_settings.json):
+* [overtraining_settings.json](settings/overtraining_settings.json):
+* [training_settings.json](settings/training_settings.json):
+* [upsampling_setting.json](settings/upsampling_setting.json):
+
+### Training Steps
+
+The steps to training the model are:
 
 1. Download and unzip the
 [TEDLIUM](http://www-lium.univ-lemans.fr/en/content/ted-lium-corpus) datase.
@@ -105,7 +164,10 @@ Several
 aspects of training including the learning rate schedule and batch size. Model
 parameters are found in the [model_settings](settings/model_settings.json) JSON
 file.
-7. After running the training (which likely take several days), the
+
+### Upsampling
+
+After running the training (which likely takes several days), the
 [upsample_audio_file](upsample_audio_file.py) script can be used to upsample
 a WAV formatted audio file from 4 kbps to 16 kbps. The settings for this script
 are found in the [upsampling_settings](settings/upsampling_settings.json) JSON file.
