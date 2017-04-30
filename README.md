@@ -24,14 +24,25 @@ the missing frequencies in the downsampled waveform using a similarity metric
 However, there is recent interest in using deep neural networks to accomplish
 this upsampling.
 
-## Dataset
+## Dataset \& Preprocessing
 
 There are a variety of domains where audio upsampling is useful.
 Since I focused on a potential voice-over-IP application, the dataset I chose
-for this repository is a collection of TED talks found
+for this repository is a collection of TED talks about 35 GB in size found
 [here](http://www-lium.univ-lemans.fr/en/content/ted-lium-corpus).
-This dataset contains primarily English speech in front an audience from a
-variety of speakers.
+Each talk is located in separate files with bit rates of 16 kbps which is
+considered high quality for speech audio.
+This dataset contains primarily well-articulated English speech in front an
+audience from a variety of speakers.
+These qualities about the TED talks are an approximation to what one may expect
+during a voice-over-IP conversation.
+
+![Preprocessing Workflow](images/Preprocessing_flow.png)
+The steps I use during preprocessing are outlined in the above figure.
+I start by trimming the first and last 30 seconds from each file to remove the
+TED logo.
+I then split the files into 2 second clips and create a separate, 4x
+downsampled set of clips at 4 kbps along with a set at the original 16 kbps.
 
 ## Installation Instructions
 
