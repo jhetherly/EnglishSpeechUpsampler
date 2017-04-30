@@ -86,7 +86,7 @@ the original, high-resolution waveform.
 
 ## Performance
 
-![Performance](images/real_full_train_test_spec_comp.pdf)
+![Performance](images/real_full_train_test_spec_comp.png)
 
 The above figure shows two quantitative measures of performance on a test sample
 after 10 epochs of training.
