@@ -1,6 +1,6 @@
 # EnglishSpeechUpsampler
 
-This repository contains the nessecary Python scripts to train and run a deep
+This repository contains the necessary Python scripts to train and run a deep
 neural network to perform upsampling on an audio waveform.
 This upsampling (also known as super-resolution) learns to infer missing high
 frequencies in a downsampled audio waveform and is based on the work presented
@@ -55,9 +55,9 @@ later use.
 
 The process of using the "Best Model" to upsample an audio file is given in the
 above figure.
-This workflow takes whole audio files, splices them into clips similarly to the
+This workflow takes whole audio files (.wav files, 16-bit PCM), splices them into clips similarly to the
 preprocessing steps, sequentially feeds them to trained model, stitches the
-high-resolution clips back together, and saves the high-resolution file to disk.
+high-resolution clips back together, and saves the high-resolution file (.wav file, 16-bit PCM) to disk.
 
 ## Model Architecture
 
@@ -119,10 +119,35 @@ To compile the custom C++ library that enables fast
 [COMPILE_FROM_BINARY](src/COMPILE_FROM_BINARY.sh) Bash script.
 This should be all that is required to run the upsampling script.
 
+An example of installation using the command line is shown below: 
+python -m venv venv
+source venv/bin/activate  // macOS/Linux
+venv\Scripts\activate  // Windows
+pip install -r requirements.txt
+cd src
+./COMPILE_FROM_BINARY.sh
+
 ## Usage
 
 Since GitHub doesn't allow for files larger than 100 MB, the model must be
 retrained in order to perform the upsampling.
+
+## Assessing Common Errors
+
+TensorFlow Versions: 
+If an error occurs due to mismatched TensorFlow release versions, make sure you have version 1.0.1 installed. 
+You can do this with the following command: 
+pip install tensorflow==1.0.1
+
+Missing Dependencies:
+If an error occurs due to missing packages or dependencies, use the following command to ensure all necessary packages are installed:
+pip install -r requirements.txt
+
+C++ Library Complications: 
+If compilation keeps failing, make sure you have g++ installed properly. 
+You can do that with the following command:
+sudo apt-get install g++  // Ubuntu/Debian
+brew install gcc // macOS
 
 ### Customization
 
@@ -133,11 +158,11 @@ This isolates much of the logic from the model hyper-parameters and
 system-specific details.
 Here is a list of the different configuration scripts
 
-* [data_settings.json](settings/data_settings.json)
-* [model_settings.json](settings/model_settings.json)
-* [overtraining_settings.json](settings/overtraining_settings.json)
-* [training_settings.json](settings/training_settings.json)
-* [upsampling_setting.json](settings/upsampling_setting.json)
+* [data_settings.json](settings/data_settings.json). This file defines dataset locations and parameters.
+* [model_settings.json](settings/model_settings.json). This file defines the model architecture and hyperparameters. 
+* [overtraining_settings.json](settings/overtraining_settings.json). This file is used to prevent overfitting of the model.
+* [training_settings.json](settings/training_settings.json). This file defines batch size, learning rate, and training schedule.
+* [upsampling_setting.json](settings/upsampling_setting.json). This file defines parameters.
 
 ### Training Steps
 
@@ -153,12 +178,12 @@ also used as the input size to the model (`splice_duration`). Smaller durations
 lead to faster model evaluations at the cost of more files being stored on disk.
 4. Run the [splice_raw_data](preprocessing/splice_raw_data.py) script from the
 preprocessing directory (or run it from any directory as long as the
-`splice_settings_file` variable points to the correct JSON file).
+`splice_settings_file` variable points to the correct JSON file). This file splits the data and downsamples the audio in the data set. 
 5. Next, run the [test_train_split](preprocessing/test_train_split.py) script to
 create the CSV files that store which samples are used for training, validation,
-and testing.
+and testing. This file splits the data set into training and testing sets.
 6. Now that the data is properly preprocessed, the training script
-([train.py](train.py)) can be run. The settings for the training script are
+([train.py](train.py)) can be run. This file trains the deep neural network. The settings for the training script are
 found in the [training_settings](settings/training_settings.json) JSON file.
 Several
 aspects of training including the learning rate schedule and batch size. Model
@@ -170,7 +195,7 @@ file.
 After running the training (which likely takes several days), the
 [upsample_audio_file](upsample_audio_file.py) script can be used to upsample
 a WAV formatted audio file from 4 kbps to 16 kbps. The settings for this script
-are found in the [upsampling_settings](settings/upsampling_settings.json) JSON file.
+are found in the [upsampling_settings](settings/upsampling_settings.json) JSON file. 
 
 ## Requirements and Dependencies
 
