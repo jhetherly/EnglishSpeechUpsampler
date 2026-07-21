@@ -97,7 +97,7 @@ print('difference between truth and reconstruction (first 20 elements)')
 print(truth.flatten()[:20] - y_reco[:20])
 
 # if waveform_reduction_factor == 1:
-print('writting output audio files')
+print('writing output audio files')
 librosa.output.write_wav('full_train_test_true.wav',
                          y=truth.flatten(), sr=true_br)
 librosa.output.write_wav('full_train_test_ds.wav',
